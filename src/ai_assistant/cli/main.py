@@ -132,8 +132,8 @@ async def _code_command(ctx, prompt, files, diff, apply):
 
 async def _chat_command(ctx):
     try:
-        # Updated to use InteractiveMode instead of InteractiveSession
-        interactive = InteractiveMode(ctx.obj)
+        # Updated to use InteractiveSession instead of InteractiveSession
+        interactive = InteractiveSession(ctx.obj)
         await interactive.start()
     except KeyboardInterrupt:
         console.print("\n[yellow]Goodbye![/yellow]")
