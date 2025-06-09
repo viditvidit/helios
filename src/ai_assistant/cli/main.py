@@ -27,19 +27,13 @@ from .interactive import InteractiveMode
 
 console = Console()
 
-def clear_screen():
-    # Works on Windows, macOS, Linux
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-clear_screen()
-
 @click.group()
 @click.option('--config', '-c', type=click.Path(exists=True), help='Config file path')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
 @click.option('--model', '-m', help='Override default model')
 @click.pass_context
 def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
-    """AI Code Assistant - Your local AI coding companion"""
+    """Helios AI Code Assistant"""
     try:
         # Initialize configuration
         config_path = Path(config) if config else None
