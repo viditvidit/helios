@@ -60,3 +60,9 @@ Traceback (most recent call last):
   File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 77, in review_changes
     raise AIAssistantError("Not a Git repository. Cannot review changes.")
 ai_assistant.core.exceptions.AIAssistantError: Not a Git repository. Cannot review changes.
+2025-06-09 18:36:23,976 - ai_assistant.cli.commands - ERROR - Error during review process: 'GitHubService' object has no attribute 'git_utils'
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 84, in review_changes
+    await self.github_service.git_utils.add_all(repo_path)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'GitHubService' object has no attribute 'git_utils'. Did you mean: 'file_utils'?

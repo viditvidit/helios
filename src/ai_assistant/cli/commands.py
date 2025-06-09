@@ -70,38 +70,48 @@ class CodeCommands:
 
     async def review_changes(self, create_branch: Optional[str] = None,
                            commit_changes: bool = False, push_changes: bool = False):
-        """Review staged changes and optionally generate a commit message."""
+        """Review staged changes and optionally commit and push them after verification."""
         try:
             repo_context = await self.github_service.get_repository_context()
             if not repo_context.get("is_git_repo"):
                 raise AIAssistantError("Not a Git repository. Cannot review changes.")
-            
+
+            # 1. Check if there are staged changes.
             staged_diff = await self.github_service.get_staged_diff()
             if not staged_diff:
-                console.print("[yellow]No changes are staged for commit. Use 'git add <files>' to stage changes.[/yellow]")
-                return
+                console.print("[yellow]No changes are currently staged for commit. Automatically staging all changes...[/yellow]")
+                repo_path = Path.cwd()
+                git_utils = GitUtils()
+                await git_utils.add_all(repo_path)
+                console.print("[green]All changes have been staged.[/green]")
+                staged_diff = await self.github_service.get_staged_diff()
+                if not staged_diff:
+                    console.print("[red]No changes were staged even after automatic staging. Aborting review process.[/red]")
+                    return
 
+            # 2. Display the staged diff for review.
             console.print(Panel(
                 Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True),
                 title="Staged Changes for Review",
                 border_style="yellow"
             ))
 
-            if commit_changes:
-                console.print("\nGenerating a commit message based on the staged changes...")
-                commit_message = await self._generate_commit_message(staged_diff)
-                
-                console.print(Panel(commit_message, title="Suggested Commit Message", border_style="green"))
-                
-                if Confirm.ask("Do you want to commit with this message?", default=True):
-                    # For now, we commit directly. A more advanced implementation
-                    # would allow editing the message.
-                    await self.github_service.git_utils.commit(commit_message)
-                    console.print(f"[green]✓ Changes committed.[/green]")
-                else:
-                    console.print("[yellow]Commit aborted by user.[/yellow]")
+            # Auto generate commit message based on staged_diff.
+            console.print("\nGenerating commit message based on staged changes...")
+            commit_message = await self._generate_commit_message(staged_diff)
+            console.print(Panel(commit_message, title="Auto-generated Commit Message", border_style="green"))
 
-        except (GitHubServiceError, Exception) as e:
+            if click.confirm("Do you want to commit and push these changes?", default=True):
+                await git_utils.commit(repo_path, commit_message)
+                console.print(f"[green]✓ Changes committed with message: {commit_message}[/green]")
+
+                branch = await git_utils.get_current_branch(repo_path)
+                await git_utils.push(repo_path, branch)
+                console.print(f"[green]✓ Changes pushed to branch {branch}.[/green]")
+            else:
+                console.print("[yellow]Commit and push aborted by user.[/yellow]")
+
+        except Exception as e:
             logger.error(f"Error during review process: {e}", exc_info=True)
             raise AIAssistantError(f"Failed to review changes: {e}")
 

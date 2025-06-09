@@ -139,13 +139,18 @@ class GitUtils:
         except Exception:
             return False
     
-    async def add_all(self, repo_path: Path) -> bool:
+    async def add_all(self, repo_path: Path) -> None:
         """Add all changes to git staging"""
-        try:
-            await self._run_git_command(repo_path, ['add', '.'])
-            return True
-        except Exception:
-            return False
+        # Run the git add command to stage all changes.
+        proc = await asyncio.create_subprocess_shell(
+            f"git -C {repo_path} add .",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise Exception(f"Error staging changes: {stderr.decode().strip()}")
+        return
     
     async def commit(self, repo_path: Path, message: str) -> bool:
         """Commit changes"""
