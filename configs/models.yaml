@@ -7,7 +7,7 @@ models:
     name: 'gemma3:27b-it-q4_K_M'
     type: 'ollama'
     endpoint: 'http://localhost:11434'
-    context_length: 16384
+    context_length: 60000
     temperature: 0.3
     system_prompt: "You are an expert coding assistant, give minimal explanation.
                     Always provide a production level code. 
@@ -21,7 +21,7 @@ models:
     name: 'deepseek-r1:32b'
     type: 'ollama'
     endpoint: 'http://localhost:11434'
-    context_length: 16384
+    context_length: 60000
     temperature: 0.3
     system_prompt: "You are Production Level Coder, 
                     an expert AI programming assistant. 

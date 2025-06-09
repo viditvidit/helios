@@ -20,7 +20,8 @@ from ..services.github_service import GitHubService
 from ..utils.git_utils import GitUtils
 from ..core.logger import setup_logging
 from .commands import CodeCommands
-from .interactive import InteractiveMode
+# Updated import to reflect the new modular structure
+from .interactive.session import InteractiveSession
 
 console = Console()
 
@@ -131,6 +132,7 @@ async def _code_command(ctx, prompt, files, diff, apply):
 
 async def _chat_command(ctx):
     try:
+        # Updated to use InteractiveMode instead of InteractiveSession
         interactive = InteractiveMode(ctx.obj)
         await interactive.start()
     except KeyboardInterrupt:
@@ -138,6 +140,7 @@ async def _chat_command(ctx):
     except AIAssistantError as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
+
 
 async def _review_command(ctx, branch, commit, push):
     try:
