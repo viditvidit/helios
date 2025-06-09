@@ -83,14 +83,30 @@ class GitHubService:
         if not repo_context_dict["is_git_repo"]:
             raise NotAGitRepositoryError(path=actual_repo_path)
 
+        # Attempt to read a README file from the repository root (if present)
+        readme_content = ""
+        readme_path = actual_repo_path / "README.md"
+        if readme_path.exists():
+            try:
+                with open(readme_path, "r", encoding="utf-8") as f:
+                    readme_content = f.read()
+            except Exception as e:
+                readme_content = f"Error reading README: {e}"
+
+        # Truncate the README content for brevity (if too long)
+        if len(readme_content) > 1000:
+            readme_content = readme_content[:1000] + "\n...[truncated]"
+
         prompt_lines = [
-            f"Please provide a concise summary of the following Git repository state at '{repo_context_dict['repo_path']}':",
+            f"Please provide a detailed 'about' summary and overview of the project repository located at '{repo_context_dict['repo_path']}'. Include its purpose, main features, and key components.",
             f"- Current Branch: {repo_context_dict['current_branch']}",
             f"- Status:\n{repo_context_dict['status']}",
             f"- Recent Commits (last 5):\n" + "\n".join([f"  - {c}" for c in repo_context_dict['recent_commits']]),
-            f"- All Branches:\n{repo_context_dict['all_branches']}",
-            "\nFocus on the current state, any uncommitted changes, and the active branch. Keep it brief."
+            f"- All Branches:\n{repo_context_dict['all_branches']}"
         ]
+        if readme_content:
+            prompt_lines.append(f"- Project Description (from README):\n{readme_content}")
+        prompt_lines.append("\nProvide an 'about' summary for this project, explaining what this repository is for, its key technologies, and its main functionalities.")
         prompt = "\n".join(prompt_lines)
 
         try:
