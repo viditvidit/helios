@@ -26,4 +26,4 @@ COPY . .
 RUN chmod +x src/ai_assistant/cli/main.py
 
 # Set the entrypoint for the container
-ENTRYPOINT ["ai-assistant"]
+ENTRYPOINT ["helios"]

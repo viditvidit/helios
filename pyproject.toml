@@ -19,7 +19,7 @@ classifiers = [
 ]
 
 [project.scripts]
-ai-assistant = "ai_assistant.cli.main:cli"
+helios = "ai_assistant.cli.main:cli"
 
 [tool.black]
 line-length = 100

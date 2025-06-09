@@ -7,12 +7,10 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
 setup(
-    name="ai-code-assistant",
+    name="helios-code-assistant",
     version="1.0.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Vidit",
     description="AI Code Assistant - Local AI coding companion",
-    long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/yourusername/ai-code-assistant",
     packages=find_packages(where="src"),
@@ -32,7 +30,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "ai-assistant=ai_assistant.cli.main:cli",
+            "helios=ai_assistant.cli.main:cli",
         ],
     },
 )
