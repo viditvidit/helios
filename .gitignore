@@ -5,3 +5,4 @@ __pycache__/
 *.pyd
 *.egg-info/
 .env*
+ai_assistant.log

@@ -72,21 +72,25 @@ class CodeCommands:
                            commit_changes: bool = False, push_changes: bool = False):
         """Review staged changes and optionally commit and push them after verification."""
         try:
+            from ai_assistant.utils.git_utils import GitUtils
+            git_utils = GitUtils()
             repo_context = await self.github_service.get_repository_context()
             if not repo_context.get("is_git_repo"):
                 raise AIAssistantError("Not a Git repository. Cannot review changes.")
 
             # 1. Check if there are staged changes.
-            staged_diff = await self.github_service.get_staged_diff()
-            if not staged_diff:
-                console.print("[yellow]No changes are currently staged for commit. Automatically staging all changes...[/yellow]")
-                repo_path = Path.cwd()
-                git_utils = GitUtils()
-                await git_utils.add_all(repo_path)
-                console.print("[green]All changes have been staged.[/green]")
-                staged_diff = await self.github_service.get_staged_diff()
-                if not staged_diff:
-                    console.print("[red]No changes were staged even after automatic staging. Aborting review process.[/red]")
+            if not (staged_diff := await self.github_service.get_staged_diff()):
+                console.print("[yellow]No changes are currently staged for commit.[/yellow]")
+                if click.confirm("Would you like to stage all changes (including untracked files)?", default=True):
+                    repo_path = Path.cwd()
+                    await git_utils.add_all(repo_path)
+                    console.print("[green]All changes have been staged.[/green]")
+                    staged_diff = await self.github_service.get_staged_diff()
+                    if not staged_diff:
+                        console.print("[red]No changes were staged even after staging. Aborting review process.[/red]")
+                        return
+                else:
+                    console.print("[yellow]Please stage changes and try again.[/yellow]")
                     return
 
             # 2. Display the staged diff for review.
@@ -97,19 +101,19 @@ class CodeCommands:
             ))
 
             # Auto generate commit message based on staged_diff.
-            console.print("\nGenerating commit message based on staged changes...")
-            commit_message = await self._generate_commit_message(staged_diff)
-            console.print(Panel(commit_message, title="Auto-generated Commit Message", border_style="green"))
-
-            if click.confirm("Do you want to commit and push these changes?", default=True):
-                await git_utils.commit(repo_path, commit_message)
+            if click.confirm("Do you want to commit the staged changes?", default=True):
+                commit_message = click.prompt("Enter commit message", default="Update via AI Assistant")
+                await git_utils.commit(Path.cwd(), commit_message)
                 console.print(f"[green]✓ Changes committed with message: {commit_message}[/green]")
 
-                branch = await git_utils.get_current_branch(repo_path)
-                await git_utils.push(repo_path, branch)
-                console.print(f"[green]✓ Changes pushed to branch {branch}.[/green]")
+                if click.confirm("Do you want to push these changes to remote?", default=True):
+                    branch = await git_utils.get_current_branch(Path.cwd())
+                    await git_utils.push(Path.cwd(), branch)
+                    console.print(f"[green]✓ Changes pushed to branch {branch}.[/green]")
+                else:
+                    console.print("[yellow]Changes committed locally but not pushed.[/yellow]")
             else:
-                console.print("[yellow]Commit and push aborted by user.[/yellow]")
+                console.print("[yellow]Staging complete. No commit operation was triggered.[/yellow]")
 
         except Exception as e:
             logger.error(f"Error during review process: {e}", exc_info=True)
@@ -256,18 +260,10 @@ class CodeCommands:
 
     async def _generate_commit_message(self, diff: str) -> str:
         """Uses the AI to generate a conventional commit message from a diff."""
-        prompt = (
-            "Based on the following git diff, please generate a concise and "
-            "informative commit message following the Conventional Commits specification. "
-            "The message should have a short title (max 50 chars), a blank line, and a brief body explaining the changes. "
-            "Do not include the diff in your response, only the commit message itself.\n\n"
-            f"```diff\n{diff}\n```"
-        )
-        request = CodeRequest(prompt=prompt)
-        
-        ai_service = AIService(self.config)
-        try:
-            commit_message = await ai_service.stream_generate(request)
-            return commit_message.strip()
-        finally:
-            await ai_service.close_session()
+        commit_message = ""
+        # Create a CodeRequest using the diff as the prompt.
+        request = CodeRequest(prompt=diff, files={}, git_context="")
+        async with AIService(self.config) as ai_service:
+            async for chunk in ai_service.stream_generate(request):
+                commit_message += chunk
+        return commit_message.strip()
