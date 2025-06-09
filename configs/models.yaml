@@ -1,0 +1,36 @@
+# Default model to use if not specified elsewhere. This must match a key under 'models'.
+default_model: "gemma3:27b-it-q4_K_M"
+
+# Dictionary of all available models. The keys are used to select a model via the CLI.
+models:
+  gemma3:27b-it-q4_K_M:
+    name: 'gemma3:27b-it-q4_K_M'
+    type: 'ollama'
+    endpoint: 'http://localhost:11434'
+    context_length: 16384
+    temperature: 0.3
+    system_prompt: "You are an expert coding assistant. 
+                    Just give minimal explanation until asked for it, or avoid as much as possible.
+                    Always provide a production level code. 
+                    When you are asked to modify a file, you MUST return the complete, 
+                    modified file content within a single markdown code block. 
+                    Make use of smartest approaches, not the basic ones. 
+                    When you generate code, you MUST give its proper name and extension, like this: ```FILENAME.EXTENSION```
+                    For example: ```file.py\n# entire file content here\n```"
+
+  deepseek-r1:32b:
+    name: 'deepseek-r1:32b'
+    type: 'ollama'
+    endpoint: 'http://localhost:11434'
+    context_length: 16384
+    temperature: 0.3
+    system_prompt: "You are Production Level Coder, 
+                    an expert AI programming assistant. 
+                    Just give minimal explanation until asked for it, or avoid as much as possible.
+                    Your task is to provide clean, efficient, 
+                    and correct code solutions, with the latest libraries and frameworks. 
+                    Make use of smartest approaches, not the basic ones. 
+                    When asked to modify a file, you MUST return the complete, 
+                    modified file content within a single markdown code block. 
+                    When you generate code, you MUST give its proper name and extension, like this: ```FILENAME.EXTENSION```
+                    For example: ```file.py\n# entire file content here\n```"

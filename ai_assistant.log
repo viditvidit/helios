@@ -1,0 +1,62 @@
+2025-06-09 12:17:37,232 - ai_assistant.cli.commands - ERROR - Error during review process: 'GitHubService' object has no attribute 'get_repository_context'
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 66, in review_changes
+    repo_context = await self.github_service.get_repository_context()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'GitHubService' object has no attribute 'get_repository_context'
+2025-06-09 12:18:27,968 - ai_assistant.cli.commands - ERROR - Error during review process: GitHubService.get_repository_context() missing 1 required positional argument: 'repo_path'
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 66, in review_changes
+    repo_context = await self.github_service.get_repository_context()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: GitHubService.get_repository_context() missing 1 required positional argument: 'repo_path'
+2025-06-09 12:19:34,311 - ai_assistant.cli.commands - ERROR - Error during review process: Not a Git repository. Cannot review changes.
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 68, in review_changes
+    raise AIAssistantError("Not a Git repository. Cannot review changes.")
+ai_assistant.core.exceptions.AIAssistantError: Not a Git repository. Cannot review changes.
+2025-06-09 12:21:48,884 - ai_assistant.cli.commands - ERROR - Error during review process: Not a Git repository. Cannot review changes.
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 68, in review_changes
+    raise AIAssistantError("Not a Git repository. Cannot review changes.")
+ai_assistant.core.exceptions.AIAssistantError: Not a Git repository. Cannot review changes.
+2025-06-09 13:16:58,212 - ai_assistant.cli.commands - ERROR - Error during code generation: Session not initialized
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 57, in generate_code
+    async for chunk in ai_service.stream_generate(request):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/services/ai_service.py", line 156, in stream_generate
+    async for chunk in self._stream_ollama(request):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/services/ai_service.py", line 165, in _stream_ollama
+    raise AIServiceError("Session not initialized")
+ai_assistant.core.exceptions.AIServiceError: Session not initialized
+2025-06-09 16:58:23,021 - ai_assistant.services.file_service - INFO - Successfully wrote changes to file: test
+2025-06-09 17:50:00,219 - ai_assistant.cli.commands - ERROR - Error during review process: Not a Git repository. Cannot review changes.
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 77, in review_changes
+    raise AIAssistantError("Not a Git repository. Cannot review changes.")
+ai_assistant.core.exceptions.AIAssistantError: Not a Git repository. Cannot review changes.
+2025-06-09 17:51:20,448 - ai_assistant.cli.commands - ERROR - Error during review process: Not a Git repository. Cannot review changes.
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 77, in review_changes
+    raise AIAssistantError("Not a Git repository. Cannot review changes.")
+ai_assistant.core.exceptions.AIAssistantError: Not a Git repository. Cannot review changes.
+2025-06-09 17:52:04,007 - ai_assistant.cli.commands - ERROR - Error during review process: Not a Git repository. Cannot review changes.
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 77, in review_changes
+    raise AIAssistantError("Not a Git repository. Cannot review changes.")
+ai_assistant.core.exceptions.AIAssistantError: Not a Git repository. Cannot review changes.
+2025-06-09 17:52:58,368 - ai_assistant.cli.commands - ERROR - Error during review process: Not a Git repository. Cannot review changes.
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 77, in review_changes
+    raise AIAssistantError("Not a Git repository. Cannot review changes.")
+ai_assistant.core.exceptions.AIAssistantError: Not a Git repository. Cannot review changes.
+2025-06-09 17:53:01,683 - ai_assistant.cli.commands - ERROR - Error during review process: Not a Git repository. Cannot review changes.
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 77, in review_changes
+    raise AIAssistantError("Not a Git repository. Cannot review changes.")
+ai_assistant.core.exceptions.AIAssistantError: Not a Git repository. Cannot review changes.
+2025-06-09 17:53:50,306 - ai_assistant.cli.commands - ERROR - Error during review process: Not a Git repository. Cannot review changes.
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 77, in review_changes
+    raise AIAssistantError("Not a Git repository. Cannot review changes.")
+ai_assistant.core.exceptions.AIAssistantError: Not a Git repository. Cannot review changes.

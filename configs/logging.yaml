@@ -1,0 +1,36 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  simple:
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  rich:
+    format: "%(message)s"
+    datefmt: "[%X]"
+
+handlers:
+  console:
+    class: rich.logging.RichHandler
+    level: INFO
+    formatter: rich
+    show_path: false
+    rich_tracebacks: true
+
+  file:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: simple
+    filename: ai_assistant.log
+    maxBytes: 10485760 # 10MB
+    backupCount: 5
+    encoding: utf8
+
+loggers:
+  ai_assistant:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: no
+
+root:
+  level: INFO
+  handlers: [console]
