@@ -357,16 +357,24 @@ contextualized to the current repository/directory.
             repo_context = await self.github_service.get_repository_context(Path.cwd())
             # List top-level repository files to include directory context.
             import os
-            repo_files = os.listdir(Path.cwd())
-            files_list_str = ", ".join(repo_files)
+            all_files = []
+            for dirpath, dirnames, filenames in os.walk(Path.cwd()):
+                for filename in filenames:
+                    rel_path = os.path.relpath(os.path.join(dirpath, filename), Path.cwd())
+                    all_files.append(rel_path)
+            # If there are too many files, display only the first 50 with a note about the rest.
+            if len(all_files) > 50:
+                files_list_str = ", ".join(all_files[:50]) + f", and {len(all_files) - 50} more files"
+            else:
+                files_list_str = ", ".join(all_files)
 
-            # Build an augmented prompt that includes repository context and file listing.
+            # Build an augmented prompt that includes repository context and a list of all files.
             augmented_prompt = (
                 f"Repository Context:\n"
                 f"- Current Branch: {repo_context.get('current_branch', 'N/A')}\n"
                 f"- Status: {repo_context.get('status', 'N/A')}\n"
                 f"- Recent Commits: {', '.join(repo_context.get('recent_commits', []))}\n"
-                f"- Top-level Files: {files_list_str}\n\n"
+                f"- Repository Files: {files_list_str}\n\n"
                 f"User Message: {message}"
             )
             request = CodeRequest(

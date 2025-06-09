@@ -89,3 +89,4 @@ Traceback (most recent call last):
   File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/click/termui.py", line 235, in confirm
     raise Abort() from None
 click.exceptions.Abort
+2025-06-09 20:34:41,715 - ai_assistant.services.file_service - ERROR - Unexpected error reading file ..: [Errno 21] Is a directory: '..'
