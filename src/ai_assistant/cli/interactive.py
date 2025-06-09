@@ -63,20 +63,22 @@ class InteractiveMode:
         """Show help information"""
         help_text = """
 [bold]Available Commands:[/bold]
-- /file <path>              - Add file to context
-- /files                    - List files in context
-- /clear                    - Clear conversation history
-- /model <name>             - Switch AI model
-- /save_conversation <path> - Save conversation to file (previously /save)
-- /save <filename>          - Save the first code block from the last AI response to <filename>
-- /git_add <file1> [f2..]   - Stage specified file(s) for commit
-- /git_commit <message>     - Commit staged changes with <message>
-- /git_push                 - Push committed changes to remote repository
-- help                      - Show this help
-- exit/quit/q               - Exit interactive mode
+  - /file <path>              - Add an existing file to context.
+  - /new <path>               - Create a new file in the repository.
+  - /files                    - List files currently added to context.
+  - /clear                    - Clear conversation history and file context.
+  - /model <name>             - Switch AI model.
+  - /save_conversation <path> - Save conversation to file (previously /save).
+  - /save <filename>          - Save the first code block from the last AI response to a file.
+  - /git_add <file1> [f2..]   - Stage specified file(s) for commit.
+  - /git_commit <message>     - Commit staged changes with a commit message.
+  - /git_push                 - Push committed changes to remote repository.
+  - help                      - Show this help.
+  - exit/quit/q               - Exit interactive mode.
 
 [bold]Chat:[/bold]
-Just type your message to chat with the AI assistant.
+Just type your message to chat with Helios. New code suggestions and file creation are automatically
+contextualized to the current repository/directory.
 """
         console.print(Panel(help_text, title="Help", border_style="green"))
 
@@ -189,6 +191,8 @@ Just type your message to chat with the AI assistant.
         
         if cmd == 'file' and args:
             await self._add_file(args[0])
+        elif cmd == 'new' and args:
+            await self._handle_new_file(args[0])
         elif cmd == 'files':
             self._list_files()
         elif cmd == 'clear':
@@ -334,17 +338,42 @@ Just type your message to chat with the AI assistant.
         except Exception as e:
             console.print(f"[red]An unexpected error occurred during git push: {e}[/red]")
 
+    async def _handle_new_file(self, file_path: str):
+        """Handles creation of a new file in the repository via the /new command."""
+        from pathlib import Path
+        path = Path(file_path)
+        if path.exists():
+            console.print(f"[yellow]File '{file_path}' already exists. Aborting new file creation.[/yellow]")
+            return
+        content = Prompt.ask(f"Enter content for new file '{file_path}' (leave blank for an empty file)", default="")
+        await self.file_service.write_file(path, content)
+        console.print(f"[green]New file created: {file_path}[/green]")
+
     async def _handle_chat(self, message: str):
         """Handle chat message"""
         try:
-            # Add to conversation history
-            self.conversation_history.append({"role": "user", "content": message})
-            
-            # Prepare request
+            # Retrieve repository context from the current directory.
+            from pathlib import Path
+            repo_context = await self.github_service.get_repository_context(Path.cwd())
+            # List top-level repository files to include directory context.
+            import os
+            repo_files = os.listdir(Path.cwd())
+            files_list_str = ", ".join(repo_files)
+
+            # Build an augmented prompt that includes repository context and file listing.
+            augmented_prompt = (
+                f"Repository Context:\n"
+                f"- Current Branch: {repo_context.get('current_branch', 'N/A')}\n"
+                f"- Status: {repo_context.get('status', 'N/A')}\n"
+                f"- Recent Commits: {', '.join(repo_context.get('recent_commits', []))}\n"
+                f"- Top-level Files: {files_list_str}\n\n"
+                f"User Message: {message}"
+            )
             request = CodeRequest(
-                prompt=message,
+                prompt=augmented_prompt,
                 files=self.current_files.copy(),
-                conversation_history=self.conversation_history.copy()
+                conversation_history=self.conversation_history.copy(),
+                git_context=str(repo_context)
             )
             
             # Generate response with streaming
@@ -385,6 +414,10 @@ Just type your message to chat with the AI assistant.
                             expand=False
                         )
                     )
+
+                # After displaying the AI response, ask if you want to review repository changes.
+                if click.confirm("Would you like to review repository changes (stage, commit, push) in the current repo?", default=False):
+                    await self._handle_repo_review()
             
         except Exception as e:
             console.print(f"[red]Error in chat: {e}[/red]")
@@ -404,3 +437,60 @@ Just type your message to chat with the AI assistant.
             formatted.append("")
         
         return '\n'.join(formatted)
+
+    async def _handle_repo_review(self):
+        """
+        Handles repository review actions: displays a condensed diff summary, 
+        allows toggling the full diff view, and then prompts to commit and push changes.
+        """
+        from pathlib import Path
+        from ai_assistant.utils.git_utils import GitUtils
+        git_utils = GitUtils()
+
+        # Get the staged diff; if none, ask the user if they want to stage all changes.
+        staged_diff = await self.github_service.get_staged_diff()
+        if not staged_diff:
+            console.print("[yellow]No changes are currently staged for commit.[/yellow]")
+            if click.confirm("Would you like to stage all changes (including untracked files)?", default=True):
+                await git_utils.add_all(Path.cwd())
+                staged_diff = await self.github_service.get_staged_diff()
+                if not staged_diff:
+                    console.print("[red]No changes were staged. Aborting repository review.[/red]")
+                    return
+            else:
+                console.print("[yellow]Repository review aborted. Please stage changes manually and try again.[/yellow]")
+                return
+
+        # Display a condensed diff (list of changed files and summary statistics)
+        import asyncio
+        proc = await asyncio.create_subprocess_shell(
+            f"git -C {Path.cwd()} diff --cached --stat",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode == 0:
+            summary_diff = stdout.decode().strip()
+        else:
+            summary_diff = "Unable to generate summary diff."
+
+        console.print(Panel(summary_diff, title="Condensed Diff (changed files summary)", border_style="yellow"))
+
+        # Ask if the user wants to view the full diff.
+        if click.confirm("Do you want to view the full diff?", default=False):
+            console.print(Panel(Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True), title="Full Diff", border_style="yellow"))
+
+        # Prompt to commit if desired.
+        if click.confirm("Do you want to commit the staged changes?", default=True):
+            commit_message = click.prompt("Enter commit message", default="Update via Helios")
+            await git_utils.commit(Path.cwd(), commit_message)
+            console.print(f"[green]✓ Changes committed with message: {commit_message}[/green]")
+
+            if click.confirm("Do you want to push these changes to remote?", default=True):
+                branch = await git_utils.get_current_branch(Path.cwd())
+                await git_utils.push(Path.cwd(), branch)
+                console.print(f"[green]✓ Changes pushed to branch {branch}.[/green]")
+            else:
+                console.print("[yellow]Changes committed locally but not pushed.[/yellow]")
+        else:
+            console.print("[yellow]No commit operation was triggered.[/yellow]")
