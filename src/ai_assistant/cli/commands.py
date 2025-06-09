@@ -5,6 +5,7 @@ import asyncio
 import logging
 import re
 import click
+import os
 from pathlib import Path
 from typing import List, Optional, Dict
 from rich.console import Console
@@ -12,6 +13,8 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.prompt import Confirm
+from rich.live import Live
+from rich.spinner import Spinner
 
 from ..core.config import Config
 from ..core.exceptions import AIAssistantError, FileServiceError, GitHubServiceError
@@ -120,8 +123,9 @@ class CodeCommands:
                 console.print(f"[green]✓ Changes committed with message: {commit_message}[/green]")
 
                 if click.confirm("Do you want to push these changes to remote?", default=True):
-                    branch = await git_utils.get_current_branch(Path.cwd())
-                    await git_utils.push(Path.cwd(), branch)
+                    with Live(Spinner("dots", text="Pushing changes..."), refresh_per_second=4, console=console):
+                        branch = await git_utils.get_current_branch(Path.cwd())
+                        await git_utils.push(Path.cwd(), branch)
                     console.print(f"[green]✓ Changes pushed to branch {branch}.[/green]")
                 else:
                     console.print("[yellow]Changes committed locally but not pushed.[/yellow]")
@@ -272,6 +276,7 @@ class CodeCommands:
             console.print(f"[red]Error applying changes to {file_path}: {e}[/red]")
 
     async def _generate_commit_message(self, diff: str) -> str:
+
         """Uses the AI to generate a conventional commit message from a diff."""
         commit_message = ""
         # Create a CodeRequest using the diff as the prompt.
@@ -280,3 +285,33 @@ class CodeCommands:
             async for chunk in ai_service.stream_generate(request):
                 commit_message += chunk
         return commit_message.strip()
+    
+    @staticmethod
+    def build_repo_context(repo_path):
+        """
+        Recursively collect the content of all text files in the given repository directory.
+        Files in directories such as .git, node_modules, or __pycache__ are skipped.
+        """
+        context = {}
+        for root, dirs, files in os.walk(repo_path):
+            # Exclude directories that are not needed
+            dirs[:] = [d for d in dirs if d not in ['.git', 'node_modules', '__pycache__']]
+            for file in files:
+                file_path = os.path.join(root, file)
+                try:
+                    # Only read text files, skipping those that cannot be decoded
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        context[file_path] = f.read()
+                except Exception as e:
+                    # Could log the exception if needed
+                    pass
+        return context
+
+    @staticmethod
+    def create_context():
+        """
+        Build context for the entire local repository.
+        Assumes the current working directory is the repository root.
+        """
+        repo_path = os.getcwd()
+        return CodeCommands.build_repo_context(repo_path)
