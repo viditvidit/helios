@@ -9,6 +9,7 @@ from rich.syntax import Syntax
 from rich.live import Live
 from rich.spinner import Spinner
 import click
+from pyfiglet import Figlet
 
 from ..core.config import Config
 from ..services.ai_service import AIService
@@ -19,6 +20,13 @@ from ..utils.file_utils import FileUtils
 from ..utils.git_utils import GitUtils
 
 console = Console()
+
+def print_helios_banner():
+    f = Figlet(font='big')
+    banner = f.renderText('HELIOS')
+    console.print(f"[bold orange1]{banner}[/bold orange1]")
+
+print_helios_banner()
 
 class InteractiveMode:
     """Interactive chat mode for AI assistant"""
@@ -173,7 +181,7 @@ Just type your message to chat with the AI assistant.
                 language = token1
             else:
                 language = None
-
+            
             extracted_items.append({
                 "language": language,
                 "filename": filename,
@@ -233,7 +241,7 @@ Just type your message to chat with the AI assistant.
 
             if not file_path_str:
                 console.print("[red]No file name provided. Aborting save operation.[/red]")
-                return
+            return
 
             if '.' not in file_path_str:
                 if suggested_filename and '.' in suggested_filename:
@@ -255,7 +263,7 @@ Just type your message to chat with the AI assistant.
                 except Exception as e:
                     console.print("[red]Invalid input. Aborting save operation.[/red]")
                     return
-
+        
             for idx in indices:
                 if idx < 1 or idx > len(code_blocks):
                     console.print(f"[red]Index {idx} is out of range. Skipping.[/red]")
