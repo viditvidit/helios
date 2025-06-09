@@ -1,3 +1,6 @@
+"""
+CLI command implementations
+"""
 import asyncio
 import logging
 import re

@@ -9,8 +9,7 @@ from rich.syntax import Syntax
 from rich.live import Live
 from rich.spinner import Spinner
 import click
-from pyfiglet import Figlet
-import os
+
 from ..core.config import Config
 from ..services.ai_service import AIService
 from ..services.file_service import FileService
@@ -20,19 +19,6 @@ from ..utils.file_utils import FileUtils
 from ..utils.git_utils import GitUtils
 
 console = Console()
-
-def clear_screen():
-    # Works on Windows, macOS, Linux
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-
-def print_helios_banner():
-    f = Figlet(font='big')
-    banner = f.renderText('HELIOS')
-    clear_screen()
-    console.print(f"[bold orange1]{banner}[/bold orange1]")
-
-print_helios_banner()
 
 class InteractiveMode:
     """Interactive chat mode for AI assistant"""
