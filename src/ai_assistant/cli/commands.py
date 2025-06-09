@@ -79,19 +79,32 @@ class CodeCommands:
                 raise AIAssistantError("Not a Git repository. Cannot review changes.")
 
             # 1. Check if there are staged changes.
-            if not (staged_diff := await self.github_service.get_staged_diff()):
-                console.print("[yellow]No changes are currently staged for commit.[/yellow]")
-                if click.confirm("Would you like to stage all changes (including untracked files)?", default=True):
-                    repo_path = Path.cwd()
-                    await git_utils.add_all(repo_path)
-                    console.print("[green]All changes have been staged.[/green]")
-                    staged_diff = await self.github_service.get_staged_diff()
-                    if not staged_diff:
-                        console.print("[red]No changes were staged even after staging. Aborting review process.[/red]")
-                        return
-                else:
-                    console.print("[yellow]Please stage changes and try again.[/yellow]")
+            staged_diff = await self.github_service.get_staged_diff()
+            if not staged_diff:
+                # Check for any modified/untracked files using "git status --porcelain"
+                proc = await asyncio.create_subprocess_shell(
+                    f"git -C {Path.cwd()} status --porcelain",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await proc.communicate()
+                status_output = stdout.decode().strip()
+                if not status_output:
+                    console.print("[yellow]No modified or untracked files found in the repository.[/yellow]")
                     return
+                else:
+                    console.print("[yellow]Detected modified/untracked files in the repository.[/yellow]")
+                    if click.confirm("Would you like to stage all changes (including untracked files)?", default=True):
+                        repo_path = Path.cwd()
+                        await git_utils.add_all(repo_path)
+                        console.print("[green]All changes have been staged.[/green]")
+                        staged_diff = await self.github_service.get_staged_diff()
+                        if not staged_diff:
+                            console.print("[red]No changes were staged even after staging. Aborting review process.[/red]")
+                            return
+                    else:
+                        console.print("[yellow]No changes were staged. Aborting review process.[/yellow]")
+                        return
 
             # 2. Display the staged diff for review.
             console.print(Panel(

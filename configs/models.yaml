@@ -9,8 +9,7 @@ models:
     endpoint: 'http://localhost:11434'
     context_length: 16384
     temperature: 0.3
-    system_prompt: "You are an expert coding assistant. 
-                    Just give minimal explanation until asked for it, or avoid as much as possible.
+    system_prompt: "You are an expert coding assistant, give minimal explanation.
                     Always provide a production level code. 
                     When you are asked to modify a file, you MUST return the complete, 
                     modified file content within a single markdown code block. 
@@ -26,7 +25,7 @@ models:
     temperature: 0.3
     system_prompt: "You are Production Level Coder, 
                     an expert AI programming assistant. 
-                    Just give minimal explanation until asked for it, or avoid as much as possible.
+                    Just give minimal explanation.
                     Your task is to provide clean, efficient, 
                     and correct code solutions, with the latest libraries and frameworks. 
                     Make use of smartest approaches, not the basic ones. 
