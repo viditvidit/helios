@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-"""
-AI Code Assistant - Main CLI Entry Point
-"""
 import asyncio
 import sys
 from pathlib import Path
