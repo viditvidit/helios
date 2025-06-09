@@ -81,3 +81,11 @@ Traceback (most recent call last):
     git_utils = GitUtils()
                 ^^^^^^^^
 UnboundLocalError: cannot access local variable 'GitUtils' where it is not associated with a value
+2025-06-09 19:28:58,342 - ai_assistant.cli.commands - ERROR - Error during review process: 
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass/src/ai_assistant/cli/commands.py", line 84, in review_changes
+    if click.confirm("Would you like to stage all changes (including untracked files)?", default=True):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/click/termui.py", line 235, in confirm
+    raise Abort() from None
+click.exceptions.Abort
