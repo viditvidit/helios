@@ -123,3 +123,35 @@ class GitUtils:
             return True
         except Exception:
             return False
+
+    async def is_file_tracked(self, repo_path: Path, file_path: str) -> bool:
+        """Check if a file is tracked by git."""
+        try:
+            result = await asyncio.create_subprocess_exec(
+                'git', 'ls-files', '--error-unmatch', file_path,
+                cwd=repo_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            await result.communicate()
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    async def has_uncommitted_changes(self, repo_path: Path, file_path: str = None) -> bool:
+        """Check if there are uncommitted changes for a specific file or repository."""
+        try:
+            cmd = ['git', 'status', '--porcelain']
+            if file_path:
+                cmd.append(file_path)
+                
+            result = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=repo_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await result.communicate()
+            return len(stdout.decode().strip()) > 0
+        except Exception:
+            return False

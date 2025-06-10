@@ -53,6 +53,17 @@ class CommandHandler:
                 await actions_impl.handle_git_push(self.session)
             elif cmd == 'review':
                 await actions_impl.handle_repo_review(self.session)
+            elif cmd == 'save' and args:
+                if not args:
+                    self.console.print("[red]Usage: /save <filename>[/red]")
+                else:
+                    await actions_impl.handle_save_last_code(self.session, args[0])
+            elif cmd == 'save_commit' and args:
+                if not args:
+                    self.console.print("[red]Usage: /save_commit <filename> [commit_message][/red]")
+                else:
+                    commit_msg = ' '.join(args[1:]) if len(args) > 1 else None
+                    await actions_impl.handle_save_and_commit(self.session, args[0], commit_msg)
             else:
                 self.console.print(f"[red]Unknown command: /{cmd}[/red]")
                 display.show_help()

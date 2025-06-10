@@ -32,7 +32,8 @@ def show_help():
   /model [name]           Show/switch AI model
   /repo                   Show repository statistics
   /new <filename>         Create a new file with AI assistance
-  /save <filename>        Save the last AI code response
+  /save <filename>        Save the last AI code response (with git suggestions)
+  /save_commit <filename> [msg] Save and auto-commit with optional message
   /save_conversation <file> Save conversation to file
   /git_add <files>        Add files to git staging
   /git_commit <message>   Commit staged changes
@@ -43,7 +44,7 @@ def show_help():
   Ctrl+C                  Stop current AI response generation
   exit, quit, bye         Exit the session
   
-[bold green]Tip:[/bold green] Repository context is automatically refreshed when you start Helios.
+[bold green]Tip:[/bold green] Use /save_commit for quick save and commit workflow!
 """
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 
