@@ -217,3 +217,5 @@ Exception: Error getting staged diff: git: 'copy' is not a git command. See 'git
 The most similar commands are
 	apply
 	clone
+2025-06-10 19:59:42,036 - ai_assistant.services.file_service - INFO - Successfully wrote changes to file: README.md
+2025-06-10 19:59:59,376 - ai_assistant.services.file_service - INFO - Successfully wrote changes to file: README.md
