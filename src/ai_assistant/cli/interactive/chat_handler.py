@@ -6,7 +6,7 @@ from rich.markdown import Markdown
 
 from ...services.ai_service import AIService
 from ...models.request import CodeRequest
-from ...utils.parsing_utils import build_file_tree, extract_code_blocks
+from ...utils.parsing_utils import extract_code_blocks
 from . import display
 
 class ChatHandler:
@@ -16,36 +16,26 @@ class ChatHandler:
         self.console = display.console
 
     async def handle(self, message: str):
-        """Handle a user's chat message using the full repository context."""
+        """
+        Handle a user's chat message by passing raw context to the AI service.
+        """
         try:
-            repo_context_summary = await self.session.github_service.get_repository_context(Path.cwd())
-
-            # The full file content is now in `self.session.current_files`
+            # Gather raw data for the AI service to format
+            git_context_dict = await self.session.github_service.get_repository_context(Path.cwd())
             full_repo_files_context = self.session.current_files
 
-            # Construct a high-level summary for the prompt, not the full content
-            file_count = len(full_repo_files_context)
-            total_lines = sum(len(content.split('\n')) for content in full_repo_files_context.values())
-
-            context_summary_for_prompt = (
-                f"Repository Context:\n"
-                f"- Current Branch: {repo_context_summary.get('current_branch', 'N/A')}\n"
-                f"- Git Status: {repo_context_summary.get('status', 'N/A')}\n"
-                f"- Total Files in Context: {file_count} files ({total_lines} total lines)\n"
-                f"- File Structure Overview: {build_file_tree(full_repo_files_context)}\n\n"
+            git_context_str = (
+                f"Current Branch: {git_context_dict.get('current_branch', 'N/A')}\n"
+                f"Status:\n{git_context_dict.get('status', 'N/A') or 'Clean'}"
             )
-
-            # Add conversation history to the prompt
-            if self.session.conversation_history:
-                context_summary_for_prompt += "Previous conversation history is included.\n\n"
-
-            augmented_prompt = f"{context_summary_for_prompt}User Message: {message}"
 
             self.session.conversation_history.append({"role": "user", "content": message})
 
+            # Create a clean request object. The AIService is responsible for building the final prompt.
             request = CodeRequest(
-                prompt=augmented_prompt,
-                files=full_repo_files_context,  # Pass all file contents to the AI service
+                prompt=message,
+                files=full_repo_files_context,
+                git_context=git_context_str,
                 conversation_history=self.session.conversation_history.copy(),
             )
 
@@ -57,18 +47,36 @@ class ChatHandler:
             self.console.print(f"[dim]{traceback.format_exc()}[/dim]")
 
     async def _stream_and_process_response(self, request: CodeRequest):
-        """Stream AI response and handle post-response actions."""
-        self.console.print("\n[bold green]AI Assistant[/bold green]:")
+        """Stream AI response and handle post-response actions, with a loading spinner."""
         response_content = ""
-        # ** THE FIX **: Initialize a blank Panel for the Live display to manage.
-        live_panel = Panel("", border_style="green")
+        is_first_chunk = True
+
+        # --- THE FIX ---
+        # 1. Create a spinner to be displayed initially.
+        spinner = Spinner("dots", text=" Thinking...")
+
+        # 2. Create the Panel with the spinner as its content.
+        live_panel = Panel(spinner, border_style="green", title="AI Assistant", title_align="left")
+
         try:
             with Live(live_panel, console=self.console, refresh_per_second=10, auto_refresh=True, vertical_overflow="visible") as live:
                 async with AIService(self.config) as ai_service:
                     async for chunk in ai_service.stream_generate(request):
-                        response_content += chunk
-                        # Update the live display with a new Panel containing the rendered Markdown
-                        live.update(Panel(Markdown(response_content, style="default"), border_style="green"))
+                        # 3. On the very first chunk of text, replace the spinner with the text.
+                        if is_first_chunk:
+                            response_content = chunk.lstrip() # Remove leading whitespace
+                            # Replace the spinner with a Markdown object INSIDE the panel
+                            live.update(Panel(Markdown(response_content, style="default"), border_style="green", title="AI Assistant", title_align="left"))
+                            is_first_chunk = False
+                        else:
+                            response_content += chunk
+                            # Update the existing Markdown object by re-creating it INSIDE the panel
+                            live.update(Panel(Markdown(response_content, style="default"), border_style="green", title="AI Assistant", title_align="left"))
+            
+            # After the live display is finished, handle the final state.
+            if is_first_chunk:
+                self.console.print(Panel("[yellow]The AI did not provide a response. This could be due to a model issue or a very large context.[/yellow]", border_style="yellow"))
+                return
 
             self.session.last_ai_response_content = response_content
             self.session.conversation_history.append({"role": "assistant", "content": response_content})
