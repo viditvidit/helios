@@ -21,38 +21,31 @@ def show_welcome():
     ))
 
 def show_help():
-    """Show help information for interactive mode."""
+    """Display available commands and controls."""
     help_text = """
-[bold]Available Commands:[/bold]
-  /help                       Show this help message.
-  /exit, /quit, /q            Exit the interactive session.
+[bold cyan]Available Commands:[/bold cyan]
+  /help                    Show this help message
+  /file <path>            Add a file to context
+  /files                  List files in current context
+  /clear                  Clear conversation history
+  /refresh                Refresh repository context
+  /model [name]           Show/switch AI model
+  /repo                   Show repository statistics
+  /new <filename>         Create a new file with AI assistance
+  /save <filename>        Save the last AI code response
+  /save_conversation <file> Save conversation to file
+  /git_add <files>        Add files to git staging
+  /git_commit <message>   Commit staged changes
+  /git_push               Push commits to remote
+  /review                 Get AI code review of repository
 
-[bold]Context Management:[/bold]
-  /file <path>                Add/update a specific file in the active context.
-  /files                      List all files currently loaded in the context.
-  /repo                       Show repository statistics and overview.
-  /refresh                    Reload all files from the repository into context.
-  /clear                      Clear the conversation history (keeps file context).
-
-[bold]Code & File Operations:[/bold]
-  /new <path>                 Create a new, empty file.
-  /save <filename>            Save the first code block from the last AI response.
-
-[bold]Git Operations:[/bold]
-  /review                     Start an interactive review of staged changes.
-  /git_add <f1> [f2..]        Stage specified file(s) for the next commit.
-  /git_commit <message>       Commit staged changes with a message.
-  /git_push                   Push committed changes to the remote repository.
-
-[bold]Session & Model:[/bold]
-  /model [name]               Show current model or switch to a new one.
-  /save_conversation <path>   Save the conversation to a markdown file.
-
-[bold]Chatting with the AI:[/bold]
-Simply type your message and press Enter. The AI has access to all loaded repository
-files to help with your request.
+[bold cyan]Controls:[/bold cyan]
+  Ctrl+C                  Stop current AI response generation
+  exit, quit, bye         Exit the session
+  
+[bold green]Tip:[/bold green] Repository context is automatically refreshed when you start Helios.
 """
-    console.print(Panel(help_text, title="[bold]Helios Help[/bold]", border_style="blue", expand=False))
+    console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 
 def list_files_in_context(current_files: Dict[str, str]):
     if not current_files:
@@ -105,3 +98,8 @@ def show_code_suggestions():
     console.print(
         Panel(suggestion_message, title="[yellow]Code Actions Available[/yellow]", border_style="yellow", expand=False)
     )
+
+def show_goodbye():
+    """Display goodbye message when exiting."""
+    console.print("\n[bold blue]Thanks for using Helios AI Assistant![/bold blue]")
+    console.print("[dim]Goodbye! 👋[/dim]\n")

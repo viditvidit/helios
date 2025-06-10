@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Optional
 import questionary
+import asyncio
+import signal
 
 from ...core.config import Config
 from ...services.file_service import FileService
@@ -30,6 +32,14 @@ class InteractiveSession:
         # Handlers
         self.command_handler = CommandHandler(self)
         self.chat_handler = ChatHandler(self)
+        
+        # Set up signal handlers for Ctrl+C
+        signal.signal(signal.SIGINT, self._handle_interrupt)
+
+    def _handle_interrupt(self, signum, frame):
+        """Handle Ctrl+C interrupt to stop AI generation."""
+        if hasattr(self, 'chat_handler'):
+            self.chat_handler.stop_generation()
 
     async def start(self):
         """Start the interactive mode session."""
@@ -38,33 +48,43 @@ class InteractiveSession:
 
         # No longer need to auto-load context. The `helios index` command handles this.
 
+        # Auto-refresh on first startup
+        try:
+            await self.command_handler.handle("/refresh")
+            display.console.print("[green]✓ Repository context initialized[/green]")
+        except Exception as e:
+            display.console.print(f"[yellow]Warning: Could not initialize repository context: {e}[/yellow]")
+
         while True:
             try:
-                user_input = await questionary.text(
-                    "You:",
-                    qmark=">",
-                    style=questionary.Style([('qmark', 'bold fg:cyan'), ('question', 'bold fg:cyan')])
-                ).ask_async()
-
-                if user_input is None:
-                    break
-
-                user_input = user_input.strip()
-
-                if not user_input:
+                user_input = await asyncio.get_event_loop().run_in_executor(
+                    None, 
+                    lambda: display.console.input("\n[bold cyan]You:[/bold cyan] ")
+                )
+                
+                if not user_input.strip():
                     continue
-                if user_input.lower() in ['exit', 'quit', 'q']:
+
+                if user_input.lower() in ['exit', 'quit', 'bye']:
+                    display.show_goodbye()
                     break
-                elif user_input.startswith('/'):
+
+                if user_input.startswith('/'):
                     await self.command_handler.handle(user_input)
                 else:
-                    self.last_ai_response_content = None
                     await self.chat_handler.handle(user_input)
 
-            except (KeyboardInterrupt, EOFError):
+            except KeyboardInterrupt:
+                # Ctrl+C pressed - stop current generation
+                self.chat_handler.stop_generation()
+                display.console.print("\n[yellow]Use 'exit' or 'quit' to leave the session.[/yellow]")
+                continue
+            except EOFError:
+                # Ctrl+D pressed
+                display.show_goodbye()
                 break
             except Exception as e:
-                display.console.print(f"[bold red]An unexpected error occurred: {e}[/bold red]")
+                display.console.print(f"[red]Unexpected error: {e}[/red]")
                 import traceback
                 display.console.print(f"[dim]{traceback.format_exc()}[/dim]")
 

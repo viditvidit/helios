@@ -3,7 +3,6 @@ from rich.console import Console
 from . import display
 from ...utils.file_utils import build_repo_context
 
-
 console = Console()
 
 async def add_file_to_context(session, file_path: str):
@@ -36,7 +35,6 @@ def switch_model(session, model_name: str):
         console.print(f"[red]Error switching model: {e}[/red]")
         available = ', '.join(session.config.models.keys())
         console.print(f"Available models: {available}")
-
 
 def _format_conversation(session) -> str:
     """Helper to format the conversation history for saving."""
@@ -73,12 +71,18 @@ async def refresh_repo_context(session):
         # Clear existing context
         session.current_files.clear()
         
-        # Re-initialize repository context if the session has a repo_context
-        if hasattr(session, 'repo_context') and session.repo_context:
-            # Refresh the repository context
-            await session.repo_context.refresh()
+        # Use the existing build_repo_context utility with required arguments
+        repo_path = Path.cwd()
+        file_contents = build_repo_context(repo_path, session.config)
         
-        console.print("[green]Repository context refreshed successfully.[/green]")
+        if file_contents:
+            # Update session current files
+            session.current_files.update(file_contents)
+            console.print(f"[green]✓ Refreshed context with {len(file_contents)} files[/green]")
+        else:
+            console.print("[yellow]No files found to index[/yellow]")
         
     except Exception as e:
         console.print(f"[red]Error refreshing repository context: {e}[/red]")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")

@@ -5,7 +5,8 @@ Handles file chunking, embedding, indexing, and searching with lazy loading to p
 import pickle
 from pathlib import Path
 from typing import List, Dict, Any
-
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import faiss
 from rich.console import Console
 from rich.progress import track
@@ -36,8 +37,9 @@ class VectorStore:
     def embedding_model(self) -> SentenceTransformer:
         """Lazy-loads the sentence transformer model when first accessed."""
         if self._embedding_model is None:
-            with console.status("[dim]Loading embedding model (first-time use)...[/dim]"):
-                self._embedding_model = SentenceTransformer(self.EMBEDDING_MODEL)
+            # Remove the console.status to avoid conflicts with other Rich displays
+            console.print("[dim]Loading embedding model (first-time use)...[/dim]")
+            self._embedding_model = SentenceTransformer(self.EMBEDDING_MODEL)
         return self._embedding_model
 
     @property
@@ -127,3 +129,9 @@ class VectorStore:
         results = [self.metadata[i] for i in indices[0] if i != -1]
         
         return results
+    
+    def clear(self):
+        """Clears the vector store by resetting index and metadata."""
+        self._index = None
+        self._metadata = None
+        console.print("[dim]Vector store cleared.[/dim]")
