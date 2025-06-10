@@ -1,16 +1,53 @@
 import difflib
+import os
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict
+
+from ..core.config import Config
+
+
+def build_repo_context(repo_path: Path, config: Config) -> Dict[str, str]:
+    """
+    Recursively collect the content of all supported text files in a directory.
+    Skips common temporary/build directories and files larger than the configured max size.
+    """
+    context = {}
+    excluded_dirs = {'.git', 'node_modules', '__pycache__', 'venv', '.venv', 'build', 'dist', 'target'}
+
+    for root, dirs, files in os.walk(repo_path, topdown=True):
+        dirs[:] = [d for d in dirs if d not in excluded_dirs]
+
+        for file in files:
+            file_path = Path(root) / file
+            try:
+                # Use relative path for keys
+                relative_path_str = str(file_path.relative_to(repo_path))
+
+                is_supported_name = file_path.name in config.supported_extensions
+                is_supported_ext = file_path.suffix in config.supported_extensions
+
+                if is_supported_name or is_supported_ext:
+                    if file_path.stat().st_size > config.max_file_size:
+                        # print(f"Skipping large file: {relative_path_str}") # Optional debug log
+                        continue
+
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        context[relative_path_str] = f.read()
+            except (IOError, OSError, UnicodeDecodeError):
+                # Ignore files that can't be opened, read, or decoded
+                continue
+    return context
+
 
 class FileUtils:
     """Utility functions for file operations"""
-    
+
     @staticmethod
     def generate_diff(original: str, modified: str, filename: str = "file") -> str:
         """Generate unified diff between two strings"""
         original_lines = original.splitlines(keepends=True)
         modified_lines = modified.splitlines(keepends=True)
-        
+
         diff = difflib.unified_diff(
             original_lines,
             modified_lines,
@@ -18,108 +55,20 @@ class FileUtils:
             tofile=f"b/{filename}",
             lineterm=""
         )
-        
+
         return ''.join(diff)
-    
+
     @staticmethod
-    def get_file_language(file_path: Path) -> str:
-        """Determine programming language from file extension"""
-        extension_map = {
-            '.py': 'python',
-            '.js': 'javascript',
-            '.ts': 'typescript',
-            '.jsx': 'javascript',
-            '.tsx': 'typescript',
-            '.java': 'java',
-            '.cpp': 'cpp',
-            '.c': 'c',
-            '.h': 'c',
-            '.hpp': 'cpp',
-            '.go': 'go',
-            '.rs': 'rust',
-            '.rb': 'ruby',
-            '.php': 'php',
-            '.html': 'html',
-            '.css': 'css',
-            '.scss': 'scss',
-            '.sass': 'sass',
-            '.json': 'json',
-            '.yaml': 'yaml',
-            '.yml': 'yaml',
-            '.xml': 'xml',
-            '.md': 'markdown',
-            '.sh': 'bash',
-            '.sql': 'sql',
-            '.r': 'r',
-            '.swift': 'swift',
-            '.kt': 'kotlin',
-            '.scala': 'scala',
-            '.clj': 'clojure'
+    def get_language_from_extension(ext: str) -> str:
+        """Get syntax highlighting language from file extension"""
+        lang_map = {
+            '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
+            '.java': 'java', '.cpp': 'cpp', '.c': 'c', '.go': 'go',
+            '.rs': 'rust', '.rb': 'ruby', '.php': 'php',
+            '.html': 'html', '.css': 'css', '.scss': 'scss',
+            '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml',
+            '.md': 'markdown', '.txt': 'text', '.sh': 'bash'
         }
-        
-        return extension_map.get(file_path.suffix.lower(), 'text')
-    
-    @staticmethod
-    def extract_functions(content: str, language: str) -> List[Tuple[str, int, int]]:
-        """Extract function definitions from code (simplified implementation)"""
-        functions = []
-        lines = content.split('\n')
-        
-        if language == 'python':
-            for i, line in enumerate(lines):
-                stripped = line.strip()
-                if stripped.startswith('def ') or stripped.startswith('async def '):
-                    func_name = stripped.split('(')[0].replace('def ', '').replace('async ', '').strip()
-                    functions.append((func_name, i + 1, i + 1))  # Simplified - just line number
-        
-        elif language in ['javascript', 'typescript']:
-            for i, line in enumerate(lines):
-                stripped = line.strip()
-                if ('function ' in stripped or 
-                    '=>' in stripped or 
-                    stripped.startswith('const ') and '=' in stripped):
-                    # Simplified function detection
-                    parts = stripped.split()
-                    if len(parts) > 1:
-                        functions.append((parts[1], i + 1, i + 1))
-        
-        return functions
-    
-    @staticmethod
-    def count_lines_of_code(content: str, language: str) -> dict:
-        """Count lines of code, comments, and blank lines"""
-        lines = content.split('\n')
-        stats = {
-            'total': len(lines),
-            'code': 0,
-            'comments': 0,
-            'blank': 0
-        }
-        
-        comment_patterns = {
-            'python': ['#'],
-            'javascript': ['//', '/*', '*'],
-            'typescript': ['//', '/*', '*'],
-            'java': ['//', '/*', '*'],
-            'cpp': ['//', '/*', '*'],
-            'c': ['//', '/*', '*'],
-            'go': ['//', '/*', '*'],
-            'rust': ['//', '/*', '*'],
-            'ruby': ['#'],
-            'php': ['//', '#', '/*', '*'],
-            'html': ['<!--'],
-            'css': ['/*', '*'],
-        }
-        
-        patterns = comment_patterns.get(language, ['#', '//'])
-        
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                stats['blank'] += 1
-            elif any(stripped.startswith(p) for p in patterns):
-                stats['comments'] += 1
-            else:
-                stats['code'] += 1
-        
-        return stats
+        return lang_map.get(ext.lower(), 'text')
+
+    # Other methods from the original file can be kept here if needed

@@ -8,53 +8,90 @@ from pathlib import Path
 from typing import Optional
 
 import click
+import questionary
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 
 from ..core.config import Config
-from ..core.exceptions import AIAssistantError, NotAGitRepositoryError
-from ..services.ai_service import AIService
-from ..services.file_service import FileService
-from ..services.github_service import GitHubService
-from ..utils.git_utils import GitUtils
+from ..core.exceptions import AIAssistantError, NotAGitRepositoryError, ConfigurationError
 from ..core.logger import setup_logging
 from .commands import CodeCommands
 from .interactive.session import InteractiveSession
+from ..utils.git_utils import GitUtils
+
 
 console = Console()
 
+async def _run_interactive_mode(config: Config):
+    """Runs the interactive REPL mode after model selection."""
+    available_models = list(config.models.keys())
+    if not available_models:
+        console.print("[red]Error: No models found in your configuration file (e.g., configs/models.yaml).[/red]")
+        sys.exit(1)
+
+    default_model = config.model_name
+
+    try:
+        # **THE FIX**: Use await .ask_async() instead of .ask()
+        chosen_model = await questionary.select(
+            "Choose a model for this session:",
+            choices=available_models,
+            default=default_model,
+            use_indicator=True,
+            style=questionary.Style([
+                ('pointer', 'bold fg:cyan'),
+                ('selected', 'fg:green'),
+                ('highlighted', 'fg:green bold'),
+            ])
+        ).ask_async() # <--- Use the async version
+
+        if chosen_model is None:
+            console.print("\n[yellow]Model selection cancelled. Exiting.[/yellow]")
+            sys.exit(0)
+
+        config.set_model(chosen_model)
+
+    except Exception as e:
+        console.print(f"\n[yellow]An issue occurred during model selection: {e}. Exiting.[/yellow]")
+        sys.exit(1)
+
+    console.print(f"Using model: [bold green]{config.model_name}[/bold green]")
+
+    session = InteractiveSession(config)
+    await session.start()
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.option('--config', '-c', type=click.Path(exists=True), help='Config file path')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
-@click.option('--model', '-m', help='Override default model')
+@click.option('--model', '-m', help='Override default model for the session')
 @click.pass_context
 def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
-    """Helios - Your AI coding companion"""
+    """Helios - Your AI coding companion.
+
+    Run without a command to enter interactive REPL mode.
+    """
     try:
-        # Initialize configuration
         config_path = Path(config) if config else None
-        ctx.obj = Config(config_path=config_path)
-        
+        cfg = Config(config_path=config_path)
+
         if model:
-            ctx.obj.model_name = model
-            
-        # Setup logging
+            cfg.set_model(model)
+
+        ctx.obj = cfg
         setup_logging(verbose)
-        
-        # Display welcome message
+
         if ctx.invoked_subcommand is None:
-            console.print(Panel.fit(
-                "[bold blue]AI Code Assistant[/bold blue]\n"
-                "Your local AI coding companion\n\n"
-                "Use --help to see available commands",
-                title="Welcome"
-            ))
-            
+            asyncio.run(_run_interactive_mode(ctx.obj))
+
+    except ConfigurationError as e:
+        console.print(f"[red]Configuration Error: {e}[/red]")
+        sys.exit(1)
     except Exception as e:
+        import traceback
         console.print(f"[red]Error initializing: {e}[/red]")
+        if verbose:
+            console.print(traceback.format_exc())
         sys.exit(1)
 
 @cli.command()
@@ -64,16 +101,13 @@ def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
 @click.option('--apply', is_flag=True, help='Apply changes automatically')
 @click.pass_context
 def code(ctx, prompt, file, diff, apply):
-    """Generate or modify code based on prompt"""
+    """Generate or modify code based on a prompt (non-interactive)."""
+    if not prompt:
+        console.print("[yellow]Please provide a prompt for the code command.[/yellow]")
+        return
     asyncio.run(_code_command(ctx, prompt, file, diff, apply))
 
-@cli.command()
-@click.pass_context
-def chat(ctx):
-    """Start interactive chat mode"""
-    asyncio.run(_chat_command(ctx))
-
-@cli.command(name="repo-summary", help="Get an AI-generated summary of a Git repository's status.") 
+@cli.command(name="repo-summary", help="Get an AI-generated summary of a Git repository's status.")
 @click.option('--path', 'repo_path_str', default=None, type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True), help="Path to the Git repository (defaults to current directory).")
 @click.pass_context
 def repo_summary_command(ctx, repo_path_str: Optional[str]):
@@ -85,36 +119,17 @@ async def _repo_summary_command(ctx, repo_path: Path):
     try:
         cmd = CodeCommands(ctx.obj)
         summary = await cmd.get_ai_repo_summary(repo_path)
-        console.print(summary)
+        console.print(Panel(summary, title="Repository Summary", border_style="blue"))
     except NotAGitRepositoryError as e:
         console.print(f"[yellow]{e.message}[/yellow]")
-        if click.confirm(f"Do you want to initialize a new Git repository at '{repo_path}'?", default=False):
-            git_utils = GitUtils()
-            initialized = await git_utils.initialize_repository(repo_path)
-            if initialized:
-                console.print(f"[green]Successfully initialized Git repository at '{repo_path}'.[/green]")
-                # Optionally, suggest creating a default branch or other next steps
-                console.print("Attempting to get repository summary again...")
-                try:
-                    summary = await cmd.get_ai_repo_summary(repo_path)
-                    console.print(summary)
-                except AIAssistantError as e_retry:
-                    console.print(f"[red]Error getting summary after initialization: {e_retry}[/red]")
-            else:
-                console.print(f"[red]Failed to initialize Git repository at '{repo_path}'.[/red]")
-        else:
-            console.print("Repository initialization skipped.")
     except AIAssistantError as e:
         console.print(f"[red]Error: {e}[/red]")
 
 @cli.command()
-@click.option('--branch', '-b', help='Create new branch for changes')
-@click.option('--commit', '-c', is_flag=True, help='Commit changes')
-@click.option('--push', is_flag=True, help='Push to remote')
 @click.pass_context
-def review(ctx, branch, commit, push):
-    """Review and commit code changes"""
-    asyncio.run(_review_command(ctx, branch, commit, push))
+def review(ctx):
+    """Review and commit code changes (non-interactive)."""
+    asyncio.run(_review_command(ctx))
 
 async def _code_command(ctx, prompt, files, diff, apply):
     try:
@@ -129,29 +144,16 @@ async def _code_command(ctx, prompt, files, diff, apply):
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
 
-async def _chat_command(ctx):
-    try:
-        # Updated to use InteractiveSession instead of InteractiveSession
-        interactive = InteractiveSession(ctx.obj)
-        await interactive.start()
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Goodbye![/yellow]")
-    except AIAssistantError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        sys.exit(1)
-
-
-async def _review_command(ctx, branch, commit, push):
+async def _review_command(ctx):
     try:
         cmd = CodeCommands(ctx.obj)
-        await cmd.review_changes(
-            create_branch=branch,
-            commit_changes=commit,
-            push_changes=push
-        )
+        await cmd.review_changes()
     except AIAssistantError as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
 
-if __name__ == '__main__':
+def main():
     cli()
+
+if __name__ == '__main__':
+    main()

@@ -5,9 +5,9 @@ default_model: "gemma3:27b-it-q4_K_M"
 common: &common_settings
   type: 'ollama'
   endpoint: 'http://localhost:11434'
-  context_length: 100000
-  temperature: 0.3
-  system_prompt: "You are an expert coding assistant providing production-level code. When asked to explain a file, do not return the whole code, just refer to certain parts of it.
+  context_length: 70000
+  temperature: 0.6
+  system_prompt: "You are an expert coding assistant providing production-level code. When asked to explain a file, do not return the whole code, just explain to certain parts of it.
                   When asked to modify a file, you MUST return the complete, modified file content within a single markdown code block.
                   Make use of smartest approaches, not the basic ones.
                   When you generate code, you MUST give its proper name and extension, like this: ```FILENAME.EXTENSION```

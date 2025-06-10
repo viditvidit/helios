@@ -90,3 +90,130 @@ Traceback (most recent call last):
     raise Abort() from None
 click.exceptions.Abort
 2025-06-09 20:34:41,715 - ai_assistant.services.file_service - ERROR - Unexpected error reading file ..: [Errno 21] Is a directory: '..'
+2025-06-10 18:23:04,748 - ai_assistant.cli.commands - ERROR - Error during review process: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/cli/commands.py", line 73, in review_changes
+    staged_diff = await self.git_utils.get_staged_diff(repo_path)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/utils/git_utils.py", line 21, in get_staged_diff
+    raise Exception(f"Error getting staged diff: {stderr.decode().strip()}")
+Exception: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+2025-06-10 18:23:43,713 - ai_assistant.cli.commands - ERROR - Error during review process: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/cli/commands.py", line 73, in review_changes
+    staged_diff = await self.git_utils.get_staged_diff(repo_path)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/utils/git_utils.py", line 21, in get_staged_diff
+    raise Exception(f"Error getting staged diff: {stderr.decode().strip()}")
+Exception: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+2025-06-10 18:28:25,376 - ai_assistant.cli.commands - ERROR - Error during review process: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/cli/commands.py", line 73, in review_changes
+    staged_diff = await self.git_utils.get_staged_diff(repo_path)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/utils/git_utils.py", line 21, in get_staged_diff
+    raise Exception(f"Error getting staged diff: {stderr.decode().strip()}")
+Exception: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+2025-06-10 18:29:56,457 - ai_assistant.cli.commands - ERROR - Error during review process: Error staging changes: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/cli/commands.py", line 77, in review_changes
+    await self.git_utils.add_all(repo_path)
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/utils/git_utils.py", line 150, in add_all
+    raise Exception(f"Error staging changes: {stderr.decode().strip()}")
+Exception: Error staging changes: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+2025-06-10 18:31:26,506 - ai_assistant.cli.commands - ERROR - Error during review process: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/cli/commands.py", line 73, in review_changes
+    staged_diff = await self.git_utils.get_staged_diff(repo_path)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/utils/git_utils.py", line 21, in get_staged_diff
+    raise Exception(f"Error getting staged diff: {stderr.decode().strip()}")
+Exception: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+2025-06-10 18:32:28,895 - ai_assistant.cli.commands - ERROR - Error during review process: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/cli/commands.py", line 73, in review_changes
+    staged_diff = await self.git_utils.get_staged_diff(repo_path)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/utils/git_utils.py", line 21, in get_staged_diff
+    raise Exception(f"Error getting staged diff: {stderr.decode().strip()}")
+Exception: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+2025-06-10 18:33:53,697 - ai_assistant.cli.commands - ERROR - Error during review process: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/cli/commands.py", line 73, in review_changes
+    staged_diff = await self.git_utils.get_staged_diff(repo_path)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/utils/git_utils.py", line 21, in get_staged_diff
+    raise Exception(f"Error getting staged diff: {stderr.decode().strip()}")
+Exception: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+2025-06-10 18:36:55,381 - ai_assistant.cli.commands - ERROR - Error during review process: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone
+Traceback (most recent call last):
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/cli/commands.py", line 73, in review_changes
+    staged_diff = await self.git_utils.get_staged_diff(repo_path)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/vidit/Documents/Dev/ass copy/src/ai_assistant/utils/git_utils.py", line 21, in get_staged_diff
+    raise Exception(f"Error getting staged diff: {stderr.decode().strip()}")
+Exception: Error getting staged diff: git: 'copy' is not a git command. See 'git --help'.
+
+The most similar commands are
+	apply
+	clone

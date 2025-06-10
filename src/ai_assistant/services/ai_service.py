@@ -138,13 +138,25 @@ class AIService:
                 error_text = await response.text()
                 raise AIServiceError(f"Ollama API error: {response.status} - {error_text}")
             
-            async for line in response.content:
-                if line:
-                    try:
-                        data = json.loads(line.decode('utf-8'))
-                        if 'response' in data:
-                            yield data['response']
-                        if data.get('done', False):
-                            break
-                    except json.JSONDecodeError:
-                        continue
+            buffer = b""
+            async for chunk in response.content.iter_chunked(1024):
+                buffer += chunk
+                while b"\n" in buffer:
+                    line, buffer = buffer.split(b"\n", 1)
+                    if line:
+                        try:
+                            data = json.loads(line.decode("utf-8"))
+                            if "response" in data:
+                                yield data["response"]
+                            if data.get("done", False):
+                                return
+                        except json.JSONDecodeError:
+                            continue
+            # Process any remaining data in buffer
+            if buffer:
+                try:
+                    data = json.loads(buffer.decode("utf-8"))
+                    if "response" in data:
+                        yield data["response"]
+                except json.JSONDecodeError:
+                    pass
