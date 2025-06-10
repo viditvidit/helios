@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import List, Optional, Dict
 
 import click
+import questionary
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.syntax import Syntax
+from rich.text import Text
 
 from ..core.config import Config
 from ..core.exceptions import AIAssistantError, FileServiceError, NotAGitRepositoryError
@@ -63,7 +65,7 @@ class CodeCommands:
             logger.error(f"Error during code generation: {e}", exc_info=True)
             raise AIAssistantError(f"Failed to generate code: {e}")
 
-    async def review_changes(self):
+    async def review_changes(self, show_summary: bool = False, show_diff: bool = True):
         """Review staged changes and optionally commit and push them after verification."""
         repo_path = Path.cwd()
         try:
@@ -72,31 +74,48 @@ class CodeCommands:
 
             staged_diff = await self.git_utils.get_staged_diff(repo_path)
             if not staged_diff:
-                console.print("[yellow]No staged changes to review.[/yellow]")
-                if click.confirm("Do you want to stage all modified files?"):
+                if await questionary.confirm("No staged changes found. Stage all modified files?").ask_async():
                     await self.git_utils.add_all(repo_path)
                     staged_diff = await self.git_utils.get_staged_diff(repo_path)
                     if not staged_diff:
                         console.print("[yellow]No changes to stage. Aborting.[/yellow]")
                         return
                 else:
+                    console.print("[yellow]No staged changes to review. Aborting.[/yellow]")
                     return
 
-            console.print(Panel(
-                Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True),
-                title="Staged Changes for Review",
-                border_style="yellow"
-            ))
-
-            if not click.confirm("Do you want to commit these changes?", default=True):
+            if show_summary:
+                changed_files = await self.git_utils.get_staged_files(repo_path)
+                console.print(Panel(
+                    "\n".join(f"- {file}" for file in changed_files),
+                    title="Staged Files for Review",
+                    border_style="yellow"
+                ))
+            elif show_diff:
+                console.print(Panel(
+                    Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True),
+                    title="Staged Changes for Review",
+                    border_style="yellow"
+                ))
+            
+            if not await questionary.confirm("Proceed to commit these changes?", default=True).ask_async():
                 console.print("[yellow]Commit aborted.[/yellow]")
                 return
 
-            commit_message = click.prompt("Enter commit message", default="feat: Update via AI Assistant")
+            # THE FIX: Directly prompt the user for the commit message.
+            commit_message = await questionary.text(
+                "Enter commit message:",
+                default="feat: Update project files" # Provide a simple default
+            ).ask_async()
+
+            if not commit_message:
+                console.print("[red]Commit message cannot be empty. Aborting.[/red]")
+                return
+
             await self.git_utils.commit(repo_path, commit_message)
             console.print(f"[green]✓ Changes committed with message: '{commit_message}'[/green]")
 
-            if click.confirm("Do you want to push these changes?", default=False):
+            if await questionary.confirm("Push changes to remote?", default=False).ask_async():
                 with console.status("[bold yellow]Pushing changes...[/bold yellow]"):
                     branch = await self.git_utils.get_current_branch(repo_path)
                     await self.git_utils.push(repo_path, branch)

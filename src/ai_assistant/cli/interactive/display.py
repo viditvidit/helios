@@ -39,13 +39,15 @@ def show_help():
   /git_add <files>         Add files to git staging
   /git_commit <message>    Commit staged changes
   /git_push                Push commits to remote
-  /review                  Interactively review and commit repository changes
+  /review [-s|-d]          Review staged changes and create a commit.
+                           -s: Show summary of changed files.
+                           -d: Show full diff of changes (default).
 
 [bold cyan]Controls:[/bold cyan]
   Ctrl+C                   Stop current AI response generation
   exit, quit, bye          Exit the session
 
-[bold green]Tip:[/bold green] After generating code, use `/apply` to save all suggested changes!
+[bold green]Tip:[/bold green] After applying changes, use `/review` for a fast commit workflow!
 """
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 

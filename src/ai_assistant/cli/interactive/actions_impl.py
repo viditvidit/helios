@@ -6,6 +6,7 @@ from ...utils.git_utils import GitUtils
 from ...utils.parsing_utils import extract_code_blocks
 from ...core.exceptions import AIAssistantError
 from ..commands import CodeCommands
+import questionary
 
 console = Console()
 
@@ -325,3 +326,17 @@ async def handle_apply_changes(session):
     if await git_utils.is_git_repo(Path.cwd()):
         files_str = " ".join(f'"{f}"' for f in applied_files) 
         console.print(f"\n[bold cyan]Git Actions:[/bold cyan] You can now stage these files with [dim]/git_add {files_str}[/dim] or use [dim]/review[/dim] to commit.")
+
+async def handle_repo_review(session, summary_only: bool, diff_only: bool):
+    """Initiates an interactive review of repository changes with options."""
+    cmd = CodeCommands(session.config)
+    try:
+        # If no flags are set, default to showing the diff.
+        # If -s is set, it takes precedence.
+        show_diff = not summary_only
+        
+        # Call the refactored review_changes method
+        await cmd.review_changes(show_summary=summary_only, show_diff=show_diff)
+
+    except AIAssistantError as e:
+        console.print(f"[red]Error during review: {e}[/red]")

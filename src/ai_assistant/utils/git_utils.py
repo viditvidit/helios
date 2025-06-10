@@ -10,7 +10,6 @@ class GitUtils:
         """
         Retrieves the diff of staged changes for the repository.
         """
-        # THE FIX: Wrap the repo_path in quotes to handle spaces in the path.
         cmd = f'git -C "{repo_path}" diff --cached'
         proc = await asyncio.create_subprocess_shell(
             cmd,
@@ -21,6 +20,15 @@ class GitUtils:
         if proc.returncode != 0:
             raise Exception(f"Error getting staged diff: {stderr.decode().strip()}")
         return stdout.decode().strip()
+
+    async def get_staged_files(self, repo_path: Path) -> List[str]:
+        """Get a list of staged file paths."""
+        try:
+            # --name-only shows only the file paths of staged files
+            result = await self._run_git_command(repo_path, ['diff', '--cached', '--name-only'])
+            return [line for line in result.splitlines() if line]
+        except Exception:
+            return []
 
     async def is_git_repo(self, repo_path: Path) -> bool:
         """Check if the directory is a git repository."""
@@ -44,7 +52,6 @@ class GitUtils:
     async def _run_git_command(self, repo_path: Path, command: List[str]) -> str:
         """
         Run a git command asynchronously using the safer exec method.
-        This method is not vulnerable to shell injection as it doesn't use the shell.
         """
         try:
             process = await asyncio.create_subprocess_exec(
@@ -56,7 +63,6 @@ class GitUtils:
             
             stdout, stderr = await process.communicate()
             
-            # Allow some commands to fail gracefully (e.g., commit with nothing to commit)
             if process.returncode != 0 and not (command[0] == 'commit' and b'nothing to commit' in stdout):
                 raise subprocess.CalledProcessError(
                     process.returncode, command, output=stdout, stderr=stderr
@@ -67,7 +73,6 @@ class GitUtils:
         except FileNotFoundError:
             raise Exception("Git not found. Please install Git.")
         except subprocess.CalledProcessError as e:
-            # Provide a more informative error message
             raise Exception(f"Git command failed: {' '.join(e.cmd)}\nError: {e.stderr.decode('utf-8').strip()}")
         except Exception as e:
             raise Exception(f"Git command failed: {e}")
@@ -93,7 +98,6 @@ class GitUtils:
     
     async def add_all(self, repo_path: Path) -> None:
         """Add all changes to git staging"""
-        # THE FIX: Wrap the repo_path in quotes to handle spaces in the path.
         cmd = f'git -C "{repo_path}" add .'
         proc = await asyncio.create_subprocess_shell(
             cmd,
@@ -111,7 +115,6 @@ class GitUtils:
             await self._run_git_command(repo_path, ['commit', '-m', message])
             return True
         except Exception as e:
-            # A commit can fail if there are no staged changes, which is not a critical error.
             if "nothing to commit" in str(e):
                 return False
             raise e
