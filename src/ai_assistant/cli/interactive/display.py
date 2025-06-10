@@ -25,26 +25,27 @@ def show_help():
     help_text = """
 [bold cyan]Available Commands:[/bold cyan]
   /help                    Show this help message
-  /file <path>            Add a file to context
-  /files                  List files in current context
-  /clear                  Clear conversation history
-  /refresh                Refresh repository context
-  /model [name]           Show/switch AI model
-  /repo                   Show repository statistics
-  /new <filename>         Create a new file with AI assistance
-  /save <filename>        Save the last AI code response (with git suggestions)
+  /file <path>             Add a file to context
+  /files                   List files in current context
+  /clear                   Clear conversation history
+  /refresh                 Refresh repository context
+  /repo                    Show repository statistics
+  /model [name]            Show/switch AI model
+  /apply                   Apply all code changes from the last AI response
+  /new <filename>          Create a new file with AI assistance
+  /save <filename>         Save the last AI code response to a specific file
   /save_commit <filename> [msg] Save and auto-commit with optional message
   /save_conversation <file> Save conversation to file
-  /git_add <files>        Add files to git staging
-  /git_commit <message>   Commit staged changes
-  /git_push               Push commits to remote
-  /review                 Get AI code review of repository
+  /git_add <files>         Add files to git staging
+  /git_commit <message>    Commit staged changes
+  /git_push                Push commits to remote
+  /review                  Interactively review and commit repository changes
 
 [bold cyan]Controls:[/bold cyan]
-  Ctrl+C                  Stop current AI response generation
-  exit, quit, bye         Exit the session
-  
-[bold green]Tip:[/bold green] Use /save_commit for quick save and commit workflow!
+  Ctrl+C                   Stop current AI response generation
+  exit, quit, bye          Exit the session
+
+[bold green]Tip:[/bold green] After generating code, use `/apply` to save all suggested changes!
 """
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 
@@ -93,7 +94,8 @@ def show_repo_stats(repo_context: Dict[str, str], git_context: Dict):
 def show_code_suggestions():
     suggestion_message = (
         "The AI response contains code. You can use commands like:\n"
-        "- `/save <filename.ext>` to save the first code block.\n"
+        "- `/apply` to automatically save all changes to their respective files.\n"
+        "- `/save <filename.ext>` to save the first code block to a new file.\n"
         "- `/review` to see all changes and commit."
     )
     console.print(

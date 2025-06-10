@@ -5,7 +5,7 @@ import click
 from ...utils.git_utils import GitUtils
 from ...utils.parsing_utils import extract_code_blocks
 from ...core.exceptions import AIAssistantError
-from ..commands import CodeCommands  # <-- **THE FIX**: Corrected import path, moved to top.
+from ..commands import CodeCommands
 
 console = Console()
 
@@ -143,6 +143,66 @@ async def handle_save_and_commit(session, filename: str, commit_message: str = N
         console.print(f"[red]Error during auto-commit: {e}[/red]")
 
 
+async def handle_apply_changes(session):
+    """Applies all code changes from the last AI response to their respective files."""
+    if not session.last_ai_response_content:
+        console.print("[red]No AI response available to apply changes from.[/red]")
+        return
+
+    code_blocks = extract_code_blocks(session.last_ai_response_content)
+    blocks_to_apply = [block for block in code_blocks if block.get('filename')]
+
+    if not blocks_to_apply:
+        console.print("[yellow]No code blocks with file paths found in the response to apply.[/yellow]")
+        console.print("Tip: You can save a snippet to a new file using: [dim]/save <filename>[/dim]")
+        return
+
+    console.print("\n[bold]The following file changes will be applied:[/bold]")
+    for block in blocks_to_apply:
+        # THE FIX: Create an absolute path to check against
+        absolute_path = Path.cwd().joinpath(block['filename'])
+        status = "[yellow]new file[/yellow]" if not absolute_path.exists() else "[cyan]overwrite[/cyan]"
+        console.print(f"  - {block['filename']} ({status})")
+
+    console.print("-" * 20)
+    applied_files = []
+    for block in blocks_to_apply:
+        filename = block['filename']
+        code = block['code']
+        # THE FIX: Create a full, absolute path for file operations.
+        path = Path.cwd().joinpath(filename)
+        
+        try:
+            # Security Check: Ensure the path is within the current working directory.
+            # `relative_to` will raise a ValueError if it's not a subpath.
+            path.relative_to(Path.cwd())
+
+            # Now, proceed with writing the file and updating context.
+            await session.file_service.write_file(path, code)
+            
+            # This will now work correctly since `path` is absolute.
+            relative_path_str = str(path.relative_to(Path.cwd()))
+            session.current_files[relative_path_str] = code
+            
+            console.print(f"[green]✓ Applied changes to {filename}[/green]")
+            applied_files.append(filename)
+        except ValueError:
+            # This catches the security error from `relative_to`.
+            console.print(f"[red]Security Error: Attempted to write to '{path}' which is outside the current project directory. Skipping.[/red]")
+        except Exception as e:
+            console.print(f"[red]Error applying changes to {filename}: {e}[/red]")
+
+    if not applied_files:
+        return
+
+    console.print("\n[green]✓ All detected changes have been applied.[/green]")
+
+    git_utils = GitUtils()
+    if await git_utils.is_git_repo(Path.cwd()):
+        files_str = " ".join(f'"{f}"' for f in applied_files) # Quote paths for safety
+        console.print(f"\n[bold cyan]Git Actions:[/bold cyan] You can now stage these files with [dim]/git_add {files_str}[/dim] or use [dim]/review[/dim] to commit.")
+
+
 async def handle_git_add(session, files: list[str]):
     """Stages one or more files using git."""
     git_utils = GitUtils()
@@ -205,9 +265,63 @@ async def handle_git_push(session):
 
 async def handle_repo_review(session):
     """Initiates an interactive review of repository changes."""
-    # **THE FIX**: The import was moved to the top. This function now just uses it.
     cmd = CodeCommands(session.config)
     try:
         await cmd.review_changes()
     except AIAssistantError as e:
         console.print(f"[red]Error during review: {e}[/red]")
+
+async def handle_apply_changes(session):
+    """Applies all code changes from the last AI response to their respective files."""
+    if not session.last_ai_response_content:
+        console.print("[red]No AI response available to apply changes from.[/red]")
+        return
+
+    code_blocks = extract_code_blocks(session.last_ai_response_content)
+    blocks_to_apply = [block for block in code_blocks if block.get('filename')]
+
+    if not blocks_to_apply:
+        console.print("[yellow]No code blocks with file paths found in the response to apply.[/yellow]")
+        console.print("Tip: You can save a snippet to a new file using: [dim]/save <filename>[/dim]")
+        return
+
+    console.print("\n[bold]The following file changes will be applied:[/bold]")
+    for block in blocks_to_apply:
+        absolute_path = Path.cwd().joinpath(block['filename'])
+        status = "[yellow]new file[/yellow]" if not absolute_path.exists() else "[cyan]overwrite[/cyan]"
+        console.print(f"  - {block['filename']} ({status})")
+
+    console.print("-" * 20)
+    applied_files = []
+    for block in blocks_to_apply:
+        filename = block['filename']
+        code = block['code']
+
+        # THE FIX: Add a sanity check for bogus paths
+        if '<' in filename or '>' in filename:
+            console.print(f"[red]Error: AI returned an invalid filename '{filename}'. Skipping.[/red]")
+            continue
+
+        path = Path.cwd().joinpath(filename)
+        
+        try:
+            path.relative_to(Path.cwd())
+            await session.file_service.write_file(path, code)
+            relative_path_str = str(path.relative_to(Path.cwd()))
+            session.current_files[relative_path_str] = code
+            console.print(f"[green]✓ Applied changes to {filename}[/green]")
+            applied_files.append(filename)
+        except ValueError:
+            console.print(f"[red]Security Error: Attempted to write to '{path}' which is outside the current project directory. Skipping.[/red]")
+        except Exception as e:
+            console.print(f"[red]Error applying changes to {filename}: {e}[/red]")
+
+    if not applied_files:
+        return
+
+    console.print("\n[green]✓ All detected changes have been applied.[/green]")
+
+    git_utils = GitUtils()
+    if await git_utils.is_git_repo(Path.cwd()):
+        files_str = " ".join(f'"{f}"' for f in applied_files) 
+        console.print(f"\n[bold cyan]Git Actions:[/bold cyan] You can now stage these files with [dim]/git_add {files_str}[/dim] or use [dim]/review[/dim] to commit.")

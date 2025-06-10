@@ -221,3 +221,7 @@ The most similar commands are
 2025-06-10 19:59:59,376 - ai_assistant.services.file_service - INFO - Successfully wrote changes to file: README.md
 2025-06-10 20:29:58,317 - ai_assistant.services.file_service - INFO - Successfully wrote changes to file: config.py
 2025-06-10 20:37:11,354 - ai_assistant.services.file_service - INFO - Successfully wrote changes to file: execptions.py
+2025-06-10 22:25:05,089 - ai_assistant.services.file_service - ERROR - Unexpected error reading file /Users/vidit/Documents/Dev/helios/request.py: File not found: /Users/vidit/Documents/Dev/helios/request.py
+2025-06-10 22:26:55,185 - ai_assistant.services.file_service - INFO - Successfully wrote changes to file: /Users/vidit/Documents/Dev/helios/src/ai_assistant/services/ai_service.py
+2025-06-10 22:30:10,577 - ai_assistant.services.file_service - INFO - Successfully wrote changes to file: /Users/vidit/Documents/Dev/helios/src/ai_assistant/models/request.py
+2025-06-10 22:31:44,230 - ai_assistant.services.file_service - INFO - Successfully wrote changes to file: /Users/vidit/Documents/Dev/helios/src/ai_assistant/models/response.py

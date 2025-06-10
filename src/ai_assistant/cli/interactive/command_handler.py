@@ -41,6 +41,8 @@ class CommandHandler:
                 await actions_impl.handle_new_file(self.session, args[0])
             elif cmd == 'save' and args:
                 await actions_impl.handle_save_last_code(self.session, args[0])
+            elif cmd == 'apply':
+                await actions_impl.handle_apply_changes(self.session)
             elif cmd == 'git_add' and args:
                 await actions_impl.handle_git_add(self.session, args)
             elif cmd == 'git_commit':
