@@ -18,7 +18,8 @@ from ..core.logger import setup_logging
 from .commands import CodeCommands
 from .interactive.session import InteractiveSession
 from ..utils.git_utils import GitUtils
-
+from ..utils.file_utils import build_repo_context
+from ..services.vector_store import VectorStore
 
 console = Console()
 
@@ -30,7 +31,6 @@ async def _run_interactive_mode(config: Config):
         sys.exit(1)
 
     default_model = config.model_name
-
     try:
         chosen_model = await questionary.select(
             "Choose a model for this session:",
@@ -49,18 +49,13 @@ async def _run_interactive_mode(config: Config):
             sys.exit(0)
 
         config.set_model(chosen_model)
-
-        # --- THE FIX ---
-        # Clear the screen after the model has been selected.
         console.clear()
-        # --- END OF FIX ---
 
     except Exception as e:
         console.print(f"\n[yellow]An issue occurred during model selection: {e}. Exiting.[/yellow]")
         sys.exit(1)
 
     console.print(f"Using model: [bold green]{config.model_name}[/bold green]")
-
     session = InteractiveSession(config)
     await session.start()
 
@@ -71,9 +66,11 @@ async def _run_interactive_mode(config: Config):
 @click.option('--model', '-m', help='Override default model for the session')
 @click.pass_context
 def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
-    """Helios - Your AI coding companion.
+    """
+    Helios - Your AI coding companion with RAG-powered context.
 
-    Run without a command to enter interactive REPL mode.
+    Run `helios index` first to build the context for your repository.
+    Then, run `helios` to start the interactive chat session.
     """
     try:
         config_path = Path(config) if config else None
@@ -97,6 +94,36 @@ def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
         if verbose:
             console.print(traceback.format_exc())
         sys.exit(1)
+
+
+@cli.command()
+@click.pass_context
+def index(ctx):
+    """
+    Scans the repository, chunks files, and creates vector embeddings for RAG.
+    This command must be run first in a new repository.
+    """
+    config = ctx.obj
+    console.print("[bold cyan]Starting repository indexing process...[/bold cyan]")
+    try:
+        repo_path = Path.cwd()
+        file_contents = build_repo_context(repo_path, config)
+        if not file_contents:
+            console.print("[yellow]No supported files found to index.[/yellow]")
+            return
+        console.print(f"Found {len(file_contents)} files to process.")
+
+        vector_store = VectorStore(config)
+        vector_store.index_files(file_contents)
+        
+        console.print("[bold green]✓ Repository indexing complete![/bold green]")
+        console.print("You can now start the chat session with `helios`.")
+
+    except Exception as e:
+        console.print(f"[bold red]An error occurred during indexing: {e}[/bold red]")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+
 
 @cli.command()
 @click.argument('prompt', nargs=-1)

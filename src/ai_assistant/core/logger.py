@@ -28,3 +28,9 @@ def setup_logging(verbose: bool = False):
     else:
         logging.basicConfig(level=level, format='%(asctime)s - %(levelname)s - %(message)s')
         logging.warning(f"{config_path} not found. Using basic config.")
+    
+    if not verbose:
+        logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+        logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
+        logging.getLogger("aiohttp").setLevel(logging.WARNING)
+        logging.getLogger("asyncio").setLevel(logging.WARNING)

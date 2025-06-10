@@ -1,0 +1,137 @@
+"""
+Manages the vector store for Retrieval-Augmented Generation (RAG).
+Handles file chunking, embedding, indexing, and searching with lazy loading.
+"""
+import pickle
+from pathlib import Path
+from typing import List, Dict, Any
+
+import faiss
+from rich.console import Console
+from rich.progress import track
+from sentence_transformers import SentenceTransformer
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+from ..core.config import Config
+
+console = Console()
+
+class VectorStore:
+    INDEX_FILE = ".helios/vector_index.faiss"
+    METADATA_FILE = ".helios/metadata.pkl"
+    EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
+
+    def __init__(self, config: Config):
+        self.config = config
+        self.index_path = Path(self.INDEX_FILE)
+        self.metadata_path = Path(self.METADATA_FILE)
+        
+        # --- THE FIX: LAZY LOADING ---
+        # Initialize resources to None. They will be loaded on first use.
+        self._embedding_model = None
+        self._index = None
+        self._metadata = None
+
+    @property
+    def embedding_model(self):
+        """Lazy-loads the sentence transformer model."""
+        if self._embedding_model is None:
+            # This print statement is useful for the `index` command but will be silent otherwise
+            console.print("[dim]Loading embedding model (first-time use)...[/dim]")
+            self._embedding_model = SentenceTransformer(self.EMBEDDING_MODEL)
+        return self._embedding_model
+
+    @property
+    def index(self):
+        """Lazy-loads the FAISS index from disk."""
+        if self._index is None:
+            if self.index_path.exists():
+                try:
+                    self._index = faiss.read_index(str(self.index_path))
+                except Exception as e:
+                    console.print(f"[red]Error loading FAISS index: {e}[/red]")
+                    self._index = None
+            else:
+                 # If we need the index but it doesn't exist, we can't proceed with a search.
+                 self._index = None
+        return self._index
+    
+    @property
+    def metadata(self) -> List[Dict[str, Any]]:
+        """Lazy-loads the metadata from disk."""
+        if self._metadata is None:
+            if self.metadata_path.exists():
+                try:
+                    with open(self.metadata_path, "rb") as f:
+                        self._metadata = pickle.load(f)
+                except Exception as e:
+                    console.print(f"[red]Error loading metadata: {e}[/red]")
+                    self._metadata = []
+            else:
+                self._metadata = []
+        return self._metadata
+
+    def save(self):
+        """Saves the FAISS index and metadata to disk."""
+        if self._index is None or self._metadata is None:
+            console.print("[yellow]Nothing to save. Index or metadata not generated.[/yellow]")
+            return
+            
+        self.index_path.parent.mkdir(exist_ok=True)
+        faiss.write_index(self._index, str(self.index_path))
+        with open(self.metadata_path, "wb") as f:
+            pickle.dump(self._metadata, f)
+
+    def index_files(self, file_contents: Dict[str, str]):
+        """Chunks, embeds, and indexes repository files."""
+        if not file_contents:
+            console.print("[yellow]No files provided for indexing.[/yellow]")
+            return
+
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000, chunk_overlap=100
+        )
+        
+        all_chunks_text = []
+        # Reset metadata before re-indexing
+        self._metadata = []
+
+        for file_path, content in track(file_contents.items(), description="[cyan]Chunking files...[/cyan]"):
+            chunks = text_splitter.split_text(content)
+            for i, chunk in enumerate(chunks):
+                all_chunks_text.append(chunk)
+                self._metadata.append({"file_path": file_path, "chunk_index": i, "text": chunk})
+
+        if not all_chunks_text:
+            console.print("[yellow]No text chunks were generated from files.[/yellow]")
+            return
+            
+        # --- THE FIX: Replace ugly progress bar with a clean spinner ---
+        with console.status("[bold yellow]Creating embeddings... (This can take a while)[/bold yellow]", spinner="earth"):
+            embeddings = self.embedding_model.encode(
+                all_chunks_text, 
+                show_progress_bar=False # Suppress the 'Batches:' progress bar
+            )
+        
+        dimension = embeddings.shape[1]
+        self._index = faiss.IndexFlatL2(dimension)
+        self._index.add(embeddings)
+        
+        console.print(f"[green]Generated and indexed {self._index.ntotal} text chunks.[/green]")
+        self.save()
+        console.print(f"[green]Index saved to {self.index_path}[/green]")
+
+
+    def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
+        """Searches the vector store for the most relevant chunks."""
+        # This will trigger the lazy loading of the index, metadata, and model if they haven't been loaded yet.
+        if self.index is None or not self.metadata:
+            console.print("[bold yellow]Warning:[/bold yellow] No vector index found. Please run `helios index` first for contextual answers.")
+            return []
+
+        query_embedding = self.embedding_model.encode([query], show_progress_bar=False)
+        distances, indices = self.index.search(query_embedding, k)
+        
+        results = [self.metadata[i] for i in indices[0] if i != -1]
+        
+        return results

@@ -68,5 +68,17 @@ async def show_repository_stats(session):
         console.print(f"[red]Error getting repository stats: {e}[/red]")
 
 async def refresh_repo_context(session):
-    """Alias to call the session's refresh method."""
-    await session.refresh_repo_context()
+    """Refresh repository context by re-scanning files and updating session state."""
+    try:
+        # Clear existing context
+        session.current_files.clear()
+        
+        # Re-initialize repository context if the session has a repo_context
+        if hasattr(session, 'repo_context') and session.repo_context:
+            # Refresh the repository context
+            await session.repo_context.refresh()
+        
+        console.print("[green]Repository context refreshed successfully.[/green]")
+        
+    except Exception as e:
+        console.print(f"[red]Error refreshing repository context: {e}[/red]")

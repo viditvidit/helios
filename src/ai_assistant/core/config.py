@@ -26,7 +26,8 @@ class ModelConfig:
     temperature: float
     system_prompt: str
     api_key: Optional[str] = None
-    max_tokens: int = 4096
+    max_tokens: int = 12288
+    timeout: int = 600
 
 @dataclass
 class GitHubConfig:
