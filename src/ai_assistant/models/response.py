@@ -14,5 +14,5 @@ class CodeResponse:
     """
     content: str  # The generated code or text content.
     model: str  # The name of the AI model used to generate the response.
-    usage: Dict[str, Any] = field(default_factory=dict)  # Dictionary containing usage information (e.g., tokens used).
+    usage: Dict[str, int] = field(default_factory=dict)  # Dictionary containing usage information (e.g., tokens used).
     metadata: Dict[str, Any] = field(default_factory=dict)  # Additional metadata about the response.
