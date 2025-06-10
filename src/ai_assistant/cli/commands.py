@@ -315,3 +315,57 @@ class CodeCommands:
         """
         repo_path = os.getcwd()
         return CodeCommands.build_repo_context(repo_path)
+
+@click.group(invoke_without_command=True)
+@click.option('--model', default=None, help="Model to use")
+@click.pass_context
+def helios(ctx, model):
+    """
+    Helios CLI entry point.
+    If no subcommand is provided, prompt the user to select a model interactively.
+    """
+    # Initialize configuration (adjust this if you load config differently)
+    config = Config()
+    ctx.obj = {"config": config}
+    if model is None and ctx.invoked_subcommand is None:
+        # Prompt user to pick a model from available models (assumes get_available_models returns a list)
+        available_models = config.get_available_models()
+        model_choice = click.prompt("Select a model", type=click.Choice(available_models))
+        config.set_current_model(model_choice)
+        click.echo(f"Model set to {model_choice}")
+        # Begin interactive command loop
+        while True:
+            cmd = click.prompt("helios>", prompt_suffix=" ")
+            if cmd.lower() in ["exit", "quit"]:
+                break
+            elif cmd.lower() == "chat":
+                ctx.invoke(chat)
+            elif cmd.lower() == "review":
+                ctx.invoke(review)
+            elif cmd.lower() == "repo-summary":
+                click.echo("Repo-summary mode not implemented yet.")
+            else:
+                click.echo(f"Unknown command: {cmd}")
+
+@helios.command()
+def chat():
+    """
+    Chat mode command.
+    """
+    config = click.get_current_context().obj.get("config")
+    code_cmds = CodeCommands(config)
+    click.echo(f"Starting chat mode with model: {config.get_current_model()}")
+    # Place chat mode implementation here.
+
+@helios.command()
+def review():
+    """
+    Review changes command.
+    """
+    config = click.get_current_context().obj.get("config")
+    code_cmds = CodeCommands(config)
+    click.echo(f"Starting review mode with model: {config.get_current_model()}")
+    # Place review mode implementation here.
+
+if __name__ == '__main__':
+    helios()

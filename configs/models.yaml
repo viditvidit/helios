@@ -1,35 +1,31 @@
 # Default model to use if not specified elsewhere. This must match a key under 'models'.
 default_model: "gemma3:27b-it-q4_K_M"
 
+# Common settings to be reused
+common: &common_settings
+  type: 'ollama'
+  endpoint: 'http://localhost:11434'
+  context_length: 100000
+  temperature: 0.3
+  system_prompt: "You are an expert coding assistant providing production-level code. When asked to explain a file, do not return the whole code, just refer to certain parts of it.
+                  When asked to modify a file, you MUST return the complete, modified file content within a single markdown code block.
+                  Make use of smartest approaches, not the basic ones.
+                  When you generate code, you MUST give its proper name and extension, like this: ```FILENAME.EXTENSION```
+                  For example: ```file.py\n# entire file content here\n```
+                  STRICT RULES:
+                  1. ONLY refer to files that exist in the provided context.
+                  2. If asked about a file that doesn't exist in this context, say 'That file doesn't exist in this repository'.
+                  3. NEVER use general programming knowledge - only use what's visible in the provided files.
+                  4. When discussing code, ALWAYS quote the exact content from the files provided.
+                  5. If you don't see something in the provided context, say you don't see it rather than making assumptions.
+                  Remember: You can ONLY see and discuss what's provided above. If it's not in this context, it doesn't exist for you, go beyond it only if asked to by the user."
+
 # Dictionary of all available models. The keys are used to select a model via the CLI.
 models:
   gemma3:27b-it-q4_K_M:
     name: 'gemma3:27b-it-q4_K_M'
-    type: 'ollama'
-    endpoint: 'http://localhost:11434'
-    context_length: 60000
-    temperature: 0.3
-    system_prompt: "You are an expert coding assistant, give minimal explanation.
-                    Always provide a production level code. 
-                    When you are asked to modify a file, you MUST return the complete, 
-                    modified file content within a single markdown code block. 
-                    Make use of smartest approaches, not the basic ones. 
-                    When you generate code, you MUST give its proper name and extension, like this: ```FILENAME.EXTENSION```
-                    For example: ```file.py\n# entire file content here\n```"
+    <<: *common_settings
 
   deepseek-r1:32b:
     name: 'deepseek-r1:32b'
-    type: 'ollama'
-    endpoint: 'http://localhost:11434'
-    context_length: 60000
-    temperature: 0.3
-    system_prompt: "You are Production Level Coder, 
-                    an expert AI programming assistant. 
-                    Just give minimal explanation.
-                    Your task is to provide clean, efficient, 
-                    and correct code solutions, with the latest libraries and frameworks. 
-                    Make use of smartest approaches, not the basic ones. 
-                    When asked to modify a file, you MUST return the complete, 
-                    modified file content within a single markdown code block. 
-                    When you generate code, you MUST give its proper name and extension, like this: ```FILENAME.EXTENSION```
-                    For example: ```file.py\n# entire file content here\n```"
+    <<: *common_settings

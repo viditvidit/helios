@@ -32,6 +32,9 @@ class InteractiveSession:
         """Start the interactive mode session."""
         display.show_welcome()
         
+        # Automatically load repository context on startup
+        await self._auto_load_repo_context()
+        
         while True:
             try:
                 user_input = Prompt.ask("\n[bold blue]You[/bold blue]")
@@ -50,3 +53,28 @@ class InteractiveSession:
                 break
             except Exception as e:
                 display.console.print(f"[bold red]An unexpected error occurred: {e}[/bold red]")
+
+    async def _auto_load_repo_context(self):
+        """Automatically load all repository files into context."""
+        try:
+            from ..commands import CodeCommands
+            repo_context = CodeCommands.build_repo_context(str(Path.cwd()))
+            
+            if repo_context:
+                self.current_files.update(repo_context)
+                file_count = len(repo_context)
+                total_lines = sum(len(content.split('\n')) for content in repo_context.values())
+                
+                display.console.print(f"[green]✓ Auto-loaded {file_count} files ({total_lines} total lines) from repository into context[/green]")
+                
+                # Show a summary of loaded files
+                if file_count > 10:
+                    sample_files = list(repo_context.keys())[:10]
+                    display.console.print(f"[dim]Sample files: {', '.join([Path(f).name for f in sample_files])}... and {file_count - 10} more[/dim]")
+                else:
+                    display.console.print(f"[dim]Loaded files: {', '.join([Path(f).name for f in repo_context.keys()])}[/dim]")
+            else:
+                display.console.print("[yellow]No files found in current directory to load into context[/yellow]")
+                
+        except Exception as e:
+            display.console.print(f"[yellow]Warning: Could not auto-load repository context: {e}[/yellow]")

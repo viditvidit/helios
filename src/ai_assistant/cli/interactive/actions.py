@@ -62,6 +62,32 @@ async def show_repository_stats(session):
     except Exception as e:
         console.print(f"[red]Error getting repository stats: {e}[/red]")
 
-def refresh_repo_context(session):
-    """Inform user that repository context will be refreshed."""
-    console.print("[yellow]Repository context will be refreshed on the next message.[/yellow]")
+async def refresh_repo_context(session):
+    """Refresh repository context by reloading all files."""
+    try:
+        from ..commands import CodeCommands
+        console.print("[yellow]Refreshing repository context...[/yellow]")
+        
+        # Clear current files and reload from repository
+        session.current_files.clear()
+        repo_context = CodeCommands.build_repo_context(str(Path.cwd()))
+        
+        if repo_context:
+            session.current_files.update(repo_context)
+            file_count = len(repo_context)
+            total_lines = sum(len(content.split('\n')) for content in repo_context.values())
+            console.print(f"[green]✓ Repository context refreshed: {file_count} files ({total_lines} total lines)[/green]")
+            
+            # Show a summary of loaded files
+            if file_count > 10:
+                sample_files = list(repo_context.keys())[:10]
+                console.print(f"[dim]Sample files: {', '.join([Path(f).name for f in sample_files])}... and {file_count - 10} more[/dim]")
+            else:
+                console.print(f"[dim]Loaded files: {', '.join([Path(f).name for f in repo_context.keys()])}[/dim]")
+        else:
+            console.print("[yellow]No files found in repository to load[/yellow]")
+            
+    except Exception as e:
+        import traceback
+        console.print(f"[red]Error refreshing repository context: {e}[/red]")
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")

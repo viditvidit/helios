@@ -20,7 +20,6 @@ from ..services.github_service import GitHubService
 from ..utils.git_utils import GitUtils
 from ..core.logger import setup_logging
 from .commands import CodeCommands
-# Updated import to reflect the new modular structure
 from .interactive.session import InteractiveSession
 
 console = Console()
@@ -33,7 +32,7 @@ console = Console()
 @click.option('--model', '-m', help='Override default model')
 @click.pass_context
 def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
-    """AI Code Assistant - Your local AI coding companion"""
+    """Helios - Your AI coding companion"""
     try:
         # Initialize configuration
         config_path = Path(config) if config else None

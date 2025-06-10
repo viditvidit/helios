@@ -1,7 +1,16 @@
 from rich.console import Console
 from rich.panel import Panel
 
+from pyfiglet import Figlet
+
 console = Console()
+
+def print_helios_banner():
+    f = Figlet(font='big')
+    banner = f.renderText('HELIOS')
+    console.print(f"[bold orange1]{banner}[/bold orange1]")
+
+print_helios_banner()
 
 def show_welcome():
     console.print(Panel.fit(
@@ -18,7 +27,7 @@ def show_help():
   - /new <path>               - Create a new file in the repository.
   - /files                    - List files currently added to context.
   - /repo                     - Show repository statistics and overview.
-  - /refresh                  - Refresh repository context for next message.
+  - /refresh                  - Refresh repository context (reload all repo files).
   - /clear                    - Clear conversation history and file context.
   - /model <name>             - Switch AI model.
   - /save_conversation <path> - Save conversation to file.
@@ -28,6 +37,10 @@ def show_help():
   - /git_push                 - Push committed changes to remote repository.
   - help                      - Show this help.
   - exit/quit/q               - Exit interactive mode.
+
+[bold]Auto-Context Loading:[/bold]
+All repository files are automatically loaded into context when you start the chat session.
+Use /refresh to reload the repository files if they have changed during your session.
 
 [bold]Chat:[/bold]
 Just type your message to chat with the AI. The assistant has full access to your repository

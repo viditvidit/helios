@@ -12,13 +12,17 @@ async def handle_save_last_code(session, filename: str):
     # from session.last_ai_response_content and save it.
 
 async def handle_git_add(session, files: list[str]):
-    console.print(f"[yellow]Action Stub: Staging files: {', '.join(files)}[/yellow]")
+    console.print(f"[yellow]Action Stub: Adding files to Git: {', '.join(files)}[/yellow]")
+    # In a real implementation, you would use GitUtils to stage the files
 
 async def handle_git_commit(session, message: str):
-    console.print(f"[yellow]Action Stub: Committing with message: '{message}'[/yellow]")
+    console.print(f"[yellow]Action Stub: Committing with message: {message}[/yellow]")
+    # In a real implementation, you would use GitUtils to commit
 
 async def handle_git_push(session):
-    console.print("[yellow]Action Stub: Pushing to remote repository.[/yellow]")
+    console.print(f"[yellow]Action Stub: Pushing to remote repository[/yellow]")
+    # In a real implementation, you would use GitUtils to push
 
 async def handle_repo_review(session):
-    console.print("[yellow]Action Stub: Starting repository review process.[/yellow]")
+    console.print(f"[yellow]Action Stub: Reviewing repository changes[/yellow]")
+    # In a real implementation, you would display and handle repository changes

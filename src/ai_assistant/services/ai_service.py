@@ -35,10 +35,6 @@ class AIService:
         try:
             if self.model_config.type == 'ollama':
                 return await self._generate_ollama(request)
-            elif self.model_config.type == 'huggingface':
-                return await self._generate_huggingface(request)
-            elif self.model_config.type == 'openai-compatible':
-                return await self._generate_openai_compatible(request)
             else:
                 raise AIServiceError(f"Unsupported model type: {self.model_config.type}")
                 
@@ -78,47 +74,6 @@ class AIService:
                     'completion_tokens': data.get('eval_count', 0),
                     'total_tokens': data.get('prompt_eval_count', 0) + data.get('eval_count', 0)
                 }
-            )
-    
-    async def _generate_huggingface(self, request: CodeRequest) -> CodeResponse:
-        """Generate code using Hugging Face Transformers"""
-        # Implementation for local HuggingFace models
-        # This would require transformers library
-        raise NotImplementedError("HuggingFace integration not implemented yet")
-    
-    async def _generate_openai_compatible(self, request: CodeRequest) -> CodeResponse:
-        """Generate code using OpenAI-compatible API"""
-        prompt = self._build_prompt(request)
-        
-        payload = {
-            "model": self.model_config.name,
-            "messages": [
-                {"role": "system", "content": self.model_config.system_prompt},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": self.model_config.temperature,
-            "max_tokens": self.model_config.max_tokens,
-        }
-        
-        headers = {}
-        if self.model_config.api_key:
-            headers["Authorization"] = f"Bearer {self.model_config.api_key}"
-        
-        if not self.session:
-            raise AIServiceError("Session not initialized")
-            
-        url = f"{self.model_config.endpoint}/v1/chat/completions"
-        
-        async with self.session.post(url, json=payload, headers=headers) as response:
-            if response.status != 200:
-                raise AIServiceError(f"API error: {response.status}")
-            
-            data = await response.json()
-            
-            return CodeResponse(
-                content=data['choices'][0]['message']['content'],
-                model=self.model_config.name,
-                usage=data.get('usage', {})
             )
     
     def _build_prompt(self, request: CodeRequest) -> str:
