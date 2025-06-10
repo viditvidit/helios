@@ -56,7 +56,7 @@ class ChatHandler:
         spinner = Spinner("dots", text=" Thinking...")
 
         # 2. Create the Panel with the spinner as its content.
-        live_panel = Panel(spinner, border_style="green", title="AI Assistant", title_align="left")
+        live_panel = Panel(spinner, border_style="green", title="Helios", title_align="left")
 
         try:
             with Live(live_panel, console=self.console, refresh_per_second=10, auto_refresh=True, vertical_overflow="visible") as live:

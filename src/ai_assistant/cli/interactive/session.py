@@ -36,7 +36,7 @@ class InteractiveSession:
 
         while True:
             try:
-                user_input = Prompt.ask("\n[bold cyan]Helios[/bold cyan]")
+                user_input = Prompt.ask("\n[bold cyan]You[/bold cyan]")
                 user_input = user_input.strip()
 
                 if not user_input:

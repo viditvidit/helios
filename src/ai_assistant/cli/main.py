@@ -32,7 +32,6 @@ async def _run_interactive_mode(config: Config):
     default_model = config.model_name
 
     try:
-        # **THE FIX**: Use await .ask_async() instead of .ask()
         chosen_model = await questionary.select(
             "Choose a model for this session:",
             choices=available_models,
@@ -43,13 +42,18 @@ async def _run_interactive_mode(config: Config):
                 ('selected', 'fg:green'),
                 ('highlighted', 'fg:green bold'),
             ])
-        ).ask_async() # <--- Use the async version
+        ).ask_async()
 
         if chosen_model is None:
             console.print("\n[yellow]Model selection cancelled. Exiting.[/yellow]")
             sys.exit(0)
 
         config.set_model(chosen_model)
+
+        # --- THE FIX ---
+        # Clear the screen after the model has been selected.
+        console.clear()
+        # --- END OF FIX ---
 
     except Exception as e:
         console.print(f"\n[yellow]An issue occurred during model selection: {e}. Exiting.[/yellow]")
