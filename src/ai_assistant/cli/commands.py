@@ -85,10 +85,12 @@ class CodeCommands:
                     console.print("[yellow]No staged changes to review. Aborting.[/yellow]")
                     return
 
-            # Get staged files using multiple methods for reliability
+            # Get staged files and their individual diffs
             changed_files = []
+            file_diffs = {}
+            
             try:
-                # Method 1: Try git diff --cached --name-only
+                # Get list of staged files
                 result = await asyncio.create_subprocess_exec(
                     'git', 'diff', '--cached', '--name-only',
                     cwd=repo_path,
@@ -101,96 +103,78 @@ class CodeCommands:
                     files = stdout.decode().strip().split('\n')
                     for file in files:
                         if file.strip():
-                            changed_files.append(f"📝 {file.strip()}")
-                else:
-                    # Method 2: Try git status --porcelain --cached
-                    result2 = await asyncio.create_subprocess_exec(
-                        'git', 'status', '--porcelain', '--cached',
-                        cwd=repo_path,
-                        stdout=asyncio.subprocess.PIPE,
-                        stderr=asyncio.subprocess.PIPE
-                    )
-                    stdout2, stderr2 = await result2.communicate()
-                    
-                    if result2.returncode == 0:
-                        lines = stdout2.decode().strip().split('\n')
-                        for line in lines:
-                            if line.strip():
-                                # Parse git status output: "M  filename" or "A  filename"
-                                status = line[:2]
-                                filename = line[3:].strip()
-                                if status.strip():
-                                    status_icon = "📝" if "M" in status else "📄" if "A" in status else "🗑️" if "D" in status else "📄"
-                                    changed_files.append(f"{status_icon} {filename}")
-                    else:
-                        # Method 3: Extract from diff output
-                        import re
-                        diff_files = re.findall(r'diff --git a/(.*?) b/', staged_diff)
-                        for file in diff_files:
-                            changed_files.append(f"📝 {file}")
-                        
+                            # Get individual file diff
+                            file_diff_result = await asyncio.create_subprocess_exec(
+                                'git', 'diff', '--cached', '--', file.strip(),
+                                cwd=repo_path,
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE
+                            )
+                            file_diff_stdout, _ = await file_diff_result.communicate()
+                            
+                            if file_diff_result.returncode == 0:
+                                file_diff = file_diff_stdout.decode()
+                                # Process diff to show only changed lines with context
+                                processed_diff = self._process_github_style_diff(file_diff)
+                                file_diffs[file.strip()] = processed_diff
+                                
+                            # Determine file status
+                            status_result = await asyncio.create_subprocess_exec(
+                                'git', 'status', '--porcelain', '--cached', '--', file.strip(),
+                                cwd=repo_path,
+                                stdout=asyncio.subprocess.PIPE,
+                                stderr=asyncio.subprocess.PIPE
+                            )
+                            status_stdout, _ = await status_result.communicate()
+                            
+                            if status_stdout:
+                                status_line = status_stdout.decode().strip()
+                                status = status_line[:2] if status_line else "M "
+                                status_icon = "📝" if "M" in status else "📄" if "A" in status else "🗑️" if "D" in status else "📄"
+                                changed_files.append(f"{status_icon} {file.strip()}")
+                            else:
+                                changed_files.append(f"📝 {file.strip()}")
+                                
             except Exception as e:
                 console.print(f"[yellow]Debug: Error getting staged files: {e}[/yellow]")
-                # Fallback: Extract from diff
+                # Fallback: Extract from main diff
                 import re
                 diff_files = re.findall(r'diff --git a/(.*?) b/', staged_diff)
                 for file in diff_files:
                     changed_files.append(f"📝 {file}")
-        
-            # Ensure we have at least something to show
-            if not changed_files and staged_diff:
-                changed_files = ["📝 Changes detected (parsing files...)"]
-        
-            if show_summary and show_diff:
-                # Create layout with two columns
-                layout = Layout()
-                layout.split_row(
-                    Layout(name="files", minimum_size=35),
-                    Layout(name="diff", ratio=2)
-                )
-                
-                # Create files panel
+                    file_diffs[file] = staged_diff  # Use full diff as fallback
+
+            # Show summary if requested
+            if show_summary:
                 if changed_files:
                     files_content = "\n".join(changed_files)
                     files_content += f"\n\n📊 Total: {len(changed_files)} files"
                 else:
                     files_content = "No staged files found"
                     
-                files_panel = Panel(
+                console.print(Panel(
                     files_content,
                     title="📋 Staged Files",
                     border_style="cyan",
                     padding=(1, 1)
-                )
-                layout["files"].update(files_panel)
-                
-                # Create diff panel
-                diff_panel = Panel(
-                    Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True),
-                    title="🔍 Changes Preview",
-                    border_style="green",
-                    padding=(1, 1)
-                )
-                layout["diff"].update(diff_panel)
-                
-                # Display the layout
-                console.print(layout)
-                
-            elif show_summary:
-                # Show only summary
-                console.print(Panel(
-                    "\n".join(changed_files) if changed_files else "No staged files found",
-                    title="📋 Staged Files",
-                    border_style="cyan"
                 ))
-            elif show_diff:
-                # Show only diff
-                console.print(Panel(
-                    Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True),
-                    title="🔍 Changes Preview",
-                    border_style="green"
-                ))
-        
+                console.print()  # Add spacing
+
+            # Show individual file diffs if requested
+            if show_diff and file_diffs:
+                for file_path, diff_content in file_diffs.items():
+                    if diff_content.strip():
+                        # Get file extension for syntax highlighting
+                        file_ext = Path(file_path).suffix.lower()
+                        
+                        console.print(Panel(
+                            Syntax(diff_content, "diff", theme="github-dark", word_wrap=True),
+                            title=f"🔍 {file_path}",
+                            border_style="green",
+                            padding=(1, 1)
+                        ))
+                        console.print()  # Add spacing between files
+
             if not click.confirm("Proceed to commit these changes?", default=True):
                 console.print("[yellow]Commit aborted.[/yellow]")
                 return
@@ -303,3 +287,35 @@ class CodeCommands:
             console.print(f"[green]✓ Applied changes to {file_path}[/green]")
         except FileServiceError as e:
             console.print(f"[red]Error applying changes to {file_path}: {e}[/red]")
+
+    def _process_github_style_diff(self, diff_content: str) -> str:
+        """Process diff content to show GitHub-style condensed view with only changed sections."""
+        if not diff_content.strip():
+            return diff_content
+            
+        lines = diff_content.split('\n')
+        processed_lines = []
+        in_hunk = False
+        context_lines = 3  # Number of context lines to show
+        
+        for line in lines:
+            # Keep diff headers
+            if line.startswith('diff --git') or line.startswith('index ') or line.startswith('---') or line.startswith('+++'):
+                processed_lines.append(line)
+            # Process hunk headers
+            elif line.startswith('@@'):
+                processed_lines.append(line)
+                in_hunk = True
+            # Process content lines in hunks
+            elif in_hunk:
+                # Always include added, removed, or context lines
+                if line.startswith(('+', '-', ' ')) or line == '':
+                    processed_lines.append(line)
+                # Stop processing if we hit another diff section
+                elif line.startswith('diff --git'):
+                    in_hunk = False
+                    processed_lines.append(line)
+            else:
+                processed_lines.append(line)
+        
+        return '\n'.join(processed_lines)
