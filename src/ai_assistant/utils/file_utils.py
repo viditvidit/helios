@@ -9,7 +9,8 @@ from ..core.config import Config
 def build_repo_context(repo_path: Path, config: Config) -> Dict[str, str]:
     """
     Recursively collect the content of all supported text files in a directory.
-    Skips common temporary/build directories and files larger than the configured max size.
+    Skips common temporary/build directories.
+    Option 1 - Remove file size limits to include full context:
     """
     context = {}
     excluded_dirs = {'.git', 'node_modules', '__pycache__', 'venv', '.venv', 'build', 'dist', 'target', 'tests'}
@@ -27,10 +28,6 @@ def build_repo_context(repo_path: Path, config: Config) -> Dict[str, str]:
                 is_supported_ext = file_path.suffix in config.supported_extensions
 
                 if is_supported_name or is_supported_ext:
-                    if file_path.stat().st_size > config.max_file_size:
-                        # print(f"Skipping large file: {relative_path_str}") # Optional debug log
-                        continue
-
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         context[relative_path_str] = f.read()
             except (IOError, OSError, UnicodeDecodeError):

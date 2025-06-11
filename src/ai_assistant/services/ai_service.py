@@ -11,6 +11,7 @@ import aiohttp
 from ..core.config import Config
 from ..core.exceptions import AIServiceError
 from ..models.request import CodeRequest
+from ..utils.parsing_utils import build_file_tree
 
 
 class AIService:
@@ -48,26 +49,31 @@ class AIService:
         # 2. User Prompt: Contains all the data - context, history, and the final request.
         user_prompt_parts = []
 
-        # Add conversation history first, so the model sees the flow.
-        # We merge this into a single user message to avoid multiple turns, which can confuse context.
-        # We don't want to include the very last user message, as we'll add it at the end.
+        # Add the full repository file tree for structural context.
+        if request.repository_files:
+            tree_str = build_file_tree(request.repository_files)
+            user_prompt_parts.append("This is the file structure of the project for your reference:")
+            user_prompt_parts.append("--- REPOSITORY FILE TREE ---")
+            user_prompt_parts.append(tree_str)
+            user_prompt_parts.append("--- END REPOSITORY FILE TREE ---")
+
+        # Add conversation history.
         history_to_include = request.conversation_history[:-1]
         if history_to_include:
-            user_prompt_parts.append("--- Previous Conversation ---")
+            user_prompt_parts.append("\n--- Previous Conversation ---")
             for turn in history_to_include:
                 user_prompt_parts.append(f"{turn['role'].capitalize()}: {turn['content']}")
-            user_prompt_parts.append("--- End of Previous Conversation ---\n")
+            user_prompt_parts.append("--- End of Previous Conversation ---")
 
-        # Add relevant file context
+        # Add relevant file context from RAG
         if request.files:
-            user_prompt_parts.append("--- Relevant File Context ---")
+            user_prompt_parts.append("\n--- Relevant File Context (from semantic search) ---")
             for file_path, content in request.files.items():
-                # Provide clear markers for the model to parse
                 user_prompt_parts.append(f"START OF FILE: {file_path}\n{content}\nEND OF FILE: {file_path}")
-            user_prompt_parts.append("--- End of File Context ---\n")
+            user_prompt_parts.append("--- End of File Context ---")
 
         # Add the actual, current user request at the very end.
-        user_prompt_parts.append(f"My Request: {request.prompt}")
+        user_prompt_parts.append(f"\nMy Request: {request.prompt}")
         
         user_prompt_content = "\n\n".join(user_prompt_parts)
         
@@ -80,7 +86,6 @@ class AIService:
 
     async def stream_generate(self, request: CodeRequest) -> AsyncGenerator[str, None]:
         if self.model_config.type == 'ollama':
-            # THE FIX: Point to the new chat streaming method
             async for chunk in self._stream_ollama_chat(request):
                 yield chunk
         else:
@@ -112,18 +117,15 @@ class AIService:
                     error_text = await response.text()
                     raise AIServiceError(f"Ollama API error ({response.status}): {error_text}")
                 
-                # Process the streaming response from the chat endpoint
                 async for line in response.content:
                     if line:
                         try:
                             data = json.loads(line.decode('utf-8'))
-                            # The chat endpoint nests the content in a 'message' object
                             if 'message' in data and 'content' in data['message']:
                                 yield data['message']['content']
                             if data.get('done', False):
                                 break
                         except json.JSONDecodeError:
-                            # In case of malformed JSON lines, just skip them.
                             continue
         except asyncio.TimeoutError:
             raise AIServiceError("Request to Ollama timed out. The model may be taking too long to respond.")

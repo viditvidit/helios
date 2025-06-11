@@ -36,16 +36,12 @@ class ChatHandler:
         """
         Searches the indexed file manifest to find the full relative path for a given base filename.
         """
-        # THE FIX: Lazily load and cache the list of all indexed file paths.
         if self._indexed_file_paths is None:
-            # This triggers the lazy load of metadata from the VectorStore
             if self.session.vector_store.metadata:
                 self._indexed_file_paths = {item['file_path'] for item in self.session.vector_store.metadata}
             else:
                 self._indexed_file_paths = set()
 
-        # Find all paths that end with the given filename (e.g., '.../request.py').
-        # This handles both `request.py` and `models/request.py` style mentions.
         basename = Path(filename).name
         matches = [p for p in self._indexed_file_paths if p.endswith(f'/{basename}') or p == basename]
         
@@ -67,7 +63,6 @@ class ChatHandler:
             if mentioned_files:
                 self.console.print(f"[dim]Found file mentions: {', '.join(mentioned_files)}[/dim]")
                 for mentioned_file in mentioned_files:
-                    # THE FIX: Use the new resolver to find the full path.
                     full_path = self._resolve_filename_to_full_path(mentioned_file)
                     
                     if full_path:
@@ -94,7 +89,7 @@ class ChatHandler:
             
             context_files.update(direct_context_files)
 
-            if not context_files:
+            if not context_files and not direct_context_files:
                 self.console.print("[yellow]Could not find specific context. The AI will answer from general knowledge.[/yellow]")
             
             # 4. Add user's message to history and create the request
@@ -103,6 +98,8 @@ class ChatHandler:
             request = CodeRequest(
                 prompt=message,
                 files=context_files,
+                # Pass the list of all files in the current context for the tree view
+                repository_files=list(self.session.current_files.keys()),
                 conversation_history=self.session.conversation_history.copy(),
             )
 

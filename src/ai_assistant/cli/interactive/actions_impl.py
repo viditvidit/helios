@@ -42,13 +42,16 @@ async def handle_save_last_code(session, filename: str):
         return
 
     code_to_save = code_blocks[0]['code']
-    path = Path(filename)
+    path = Path.cwd().joinpath(filename)
     
     # Check if file already exists
     file_exists = path.exists()
     action_verb = "Updated" if file_exists else "Created"
     
     try:
+        # Ensure parent directory exists
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
         await session.file_service.write_file(path, code_to_save)
         console.print(f"[green]✓ {action_verb} file: {filename}[/green]")
         
@@ -162,7 +165,7 @@ async def handle_apply_changes(session):
 
     console.print("\n[bold]The following file changes will be applied:[/bold]")
     for block in blocks_to_apply:
-        # THE FIX: Create an absolute path to check against
+        # Create an absolute path to check against
         absolute_path = Path.cwd().joinpath(block['filename'])
         status = "[yellow]new file[/yellow]" if not absolute_path.exists() else "[cyan]overwrite[/cyan]"
         console.print(f"  - {block['filename']} ({status})")
@@ -172,7 +175,7 @@ async def handle_apply_changes(session):
     for block in blocks_to_apply:
         filename = block['filename']
         code = block['code']
-        # THE FIX: Create a full, absolute path for file operations.
+        # Create a full, absolute path for file operations.
         path = Path.cwd().joinpath(filename)
         
         try:
@@ -180,10 +183,12 @@ async def handle_apply_changes(session):
             # `relative_to` will raise a ValueError if it's not a subpath.
             path.relative_to(Path.cwd())
 
+            # Ensure parent directory exists before writing
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
             # Now, proceed with writing the file and updating context.
             await session.file_service.write_file(path, code)
             
-            # This will now work correctly since `path` is absolute.
             relative_path_str = str(path.relative_to(Path.cwd()))
             session.current_files[relative_path_str] = code
             

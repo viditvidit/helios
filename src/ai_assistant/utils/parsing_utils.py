@@ -40,7 +40,8 @@ def extract_code_blocks(text: str) -> List[Dict[str, str]]:
                     filename = part
                 else:
                     remaining_parts.append(part)
-        else: # filename was found with filename="..."
+        else:
+            # filename was found with filename="..."
             remaining_parts = parts
 
         # 3. Assume the first remaining part is the language
@@ -49,7 +50,7 @@ def extract_code_blocks(text: str) -> List[Dict[str, str]]:
         
         # We only care about blocks that have identified code
         if code:
-             extracted_items.append({
+            extracted_items.append({
                 "language": language,
                 "filename": filename,
                 "code": code
@@ -57,12 +58,38 @@ def extract_code_blocks(text: str) -> List[Dict[str, str]]:
             
     return extracted_items
 
-def build_file_tree(file_context: Dict[str, str], max_files: int = 20) -> str:
-    """Build a concise file tree representation."""
-    file_paths = list(file_context.keys())
+def build_file_tree(file_paths: List[str]) -> str:
+    """
+    Builds a textual representation of a file tree from a list of file paths.
     
-    if len(file_paths) <= max_files:
-        return ", ".join([Path(p).name for p in file_paths])
-    else:
-        shown_files = [Path(p).name for p in file_paths[:max_files]]
-        return f"{', '.join(shown_files)}, and {len(file_paths) - max_files} more files"
+    Example:
+    ['src/main.py', 'src/utils/helpers.py', 'README.md']
+    
+    Output:
+    ├── README.md
+    └── src
+        ├── main.py
+        └── utils
+            └── helpers.py
+    """
+    tree = {}
+    for path_str in sorted(file_paths):
+        path = Path(path_str)
+        parts = path.parts
+        node = tree
+        for part in parts:
+            node = node.setdefault(part, {})
+
+    def generate_tree_lines(d, indent=''):
+        lines = []
+        # Sort items: directories first, then files alphabetically
+        items = sorted(d.items(), key=lambda x: (not bool(x[1]), x[0]))
+        for i, (name, children) in enumerate(items):
+            connector = '└── ' if i == len(items) - 1 else '├── '
+            lines.append(f"{indent}{connector}{name}")
+            if children:
+                extension = '    ' if i == len(items) - 1 else '│   '
+                lines.extend(generate_tree_lines(children, indent + extension))
+        return lines
+
+    return '\n'.join(generate_tree_lines(tree))
