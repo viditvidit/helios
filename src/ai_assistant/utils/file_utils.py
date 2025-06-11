@@ -12,7 +12,7 @@ def build_repo_context(repo_path: Path, config: Config) -> Dict[str, str]:
     Skips common temporary/build directories and files larger than the configured max size.
     """
     context = {}
-    excluded_dirs = {'.git', 'node_modules', '__pycache__', 'venv', '.venv', 'build', 'dist', 'target'}
+    excluded_dirs = {'.git', 'node_modules', '__pycache__', 'venv', '.venv', 'build', 'dist', 'target', 'tests'}
 
     for root, dirs, files in os.walk(repo_path, topdown=True):
         dirs[:] = [d for d in dirs if d not in excluded_dirs]

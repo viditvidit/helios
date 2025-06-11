@@ -26,7 +26,7 @@ class ModelConfig:
     temperature: float
     system_prompt: str
     api_key: Optional[str] = None
-    max_tokens: int = 12288
+    max_tokens: int = 80000
     timeout: int = 600
 
 @dataclass
