@@ -1,4 +1,5 @@
 import os
+import asyncio
 from pathlib import Path
 from typing import Optional, List
 from rich.console import Console
@@ -30,7 +31,7 @@ class GitHubService:
 
     async def get_repository_context(self, repo_path: Path = None) -> dict:
         """
-        Restored Method: Gets the local repository context using Git commands.
+        Gets the local repository context using Git commands.
         """
         repo_path = repo_path or Path.cwd()
         context = {
@@ -58,6 +59,7 @@ class GitHubService:
         if not remote_url_raw:
             raise GitHubServiceError("Could not determine remote 'origin' URL. Is the repository pushed to GitHub?")
         
+        # Parses URLs like 'https://github.com/owner/repo.git' or 'git@github.com:owner/repo.git'
         repo_name_full = remote_url_raw.split('/')[-1].replace('.git', '')
         repo_owner = remote_url_raw.split('/')[-2].split(':')[-1]
         repo_slug = f"{repo_owner}/{repo_name_full}"
@@ -70,11 +72,17 @@ class GitHubService:
     async def create_repo(self, repo_name: str, private: bool = True, description: str = "") -> str:
         """Creates a new repository on GitHub."""
         try:
-            repo = self.user.create_repo(name=repo_name, private=private, description=description, auto_init=True)
+            repo = self.user.create_repo(
+                name=repo_name,
+                private=private,
+                description=description,
+                auto_init=True  # Creates with a README
+            )
             console.print(f"[green]✓ Successfully created repository: {repo.full_name}[/green]")
             return repo.clone_url
         except GithubException as e:
-            if e.status == 422: raise GitHubServiceError(f"Repository '{repo_name}' likely already exists.")
+            if e.status == 422: # Unprocessable Entity - often means repo already exists
+                raise GitHubServiceError(f"Repository '{repo_name}' likely already exists on GitHub.")
             raise GitHubServiceError(f"Failed to create repository: {e.data['message']}")
 
     async def create_branch(self, branch_name: str, source_branch: str = 'main'):
@@ -85,51 +93,91 @@ class GitHubService:
             repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=source.commit.sha)
             console.print(f"[green]✓ Successfully created branch '{branch_name}' from '{source_branch}'.[/green]")
         except GithubException as e:
-            if e.status == 422: raise GitHubServiceError(f"Branch '{branch_name}' already exists.")
+            if e.status == 422:
+                raise GitHubServiceError(f"Branch '{branch_name}' already exists.")
             raise GitHubServiceError(f"Failed to create branch: {e}")
 
     async def create_pull_request(self, title: str, body: str, head_branch: str, base_branch: str) -> str:
         """Creates a pull request."""
         repo = await self._get_repo_object()
         try:
-            pr = repo.create_pull(title=title, body=body, head=head_branch, base=base_branch)
+            pr = repo.create_pull(
+                title=title,
+                body=body,
+                head=head_branch,
+                base=base_branch
+            )
             console.print(f"[green]✓ Successfully created Pull Request #{pr.number}: {pr.html_url}[/green]")
             return pr.html_url
         except GithubException as e:
-            errors = e.data.get('errors', [{}]); message = errors[0].get('message', 'Could not create PR.')
+            errors = e.data.get('errors', [{}])
+            message = errors[0].get('message', 'Could not create pull request.')
             raise GitHubServiceError(f"Failed to create Pull Request: {message}")
 
+    async def _get_diff_summary(self, filename: str, patch: str) -> str:
+        """Sends a single file's diff to the AI for a quick summary."""
+        prompt = (
+            f"Summarize the following code changes for the file `{filename}` in a single sentence. "
+            f"Focus on the 'what' and 'why'.\n\n--- DIFF ---\n{patch}"
+        )
+        request = CodeRequest(prompt=prompt)
+        summary = ""
+        try:
+            async with AIService(self.config) as ai_service:
+                # Use a shorter timeout for these small, quick summaries
+                ai_service.session.timeout.total = 60 
+                async for chunk in ai_service.stream_generate(request):
+                    summary += chunk
+            return f"- **{filename}**: {summary.strip()}"
+        except Exception:
+            return f"- **{filename}**: Could not summarize (request may have timed out)."
+
     async def get_ai_pr_summary(self, pr_number: int) -> str:
-        """NEW: Gets an AI-generated summary of a pull request."""
+        """
+        Two-stage pipeline for fast and reliable PR reviews.
+        1. Concurrently summarize diffs for each file.
+        2. Combine summaries into a final review prompt.
+        """
         repo = await self._get_repo_object()
         try:
             pr = repo.get_pull(pr_number)
             files = pr.get_files()
-            diff_content = "\n\n".join([f"--- Diff for {file.filename} ---\n{file.patch}" for file in files])
-            prompt = (
-                f"Please provide a concise review of the following pull request.\n"
-                f"PR Title: {pr.title}\n"
-                f"PR Body:\n{pr.body}\n\n"
-                f"Code Changes (diff):\n{diff_content}\n\n"
-                "Your review should summarize the purpose of the changes, highlight the key modifications, "
-                "and identify any potential issues, bugs, or areas for improvement. Be constructive."
+
+            # --- Stage 1: Concurrent Summarization ---
+            console.print(f"[dim]Summarizing {len(list(files))} changed files...[/dim]")
+            summary_tasks = [self._get_diff_summary(file.filename, file.patch) for file in files if file.patch]
+            file_summaries = await asyncio.gather(*summary_tasks)
+            
+            summaries_text = "\n".join(file_summaries)
+
+            # --- Stage 2: Final Review ---
+            console.print("[dim]Generating final review...[/dim]")
+            final_prompt = (
+                f"Please provide a concise, high-level review of the following pull request.\n\n"
+                f"**PR Title**: {pr.title}\n"
+                f"**PR Body**: {pr.body or 'No description provided.'}\n\n"
+                f"**Summary of File Changes**:\n{summaries_text}\n\n"
+                "Based on the title, body, and the file change summaries, please:\n"
+                "1.  Write a brief overall summary of the PR's purpose.\n"
+                "2.  Identify any potential risks, logical gaps, or areas that might need closer inspection."
             )
-            request = CodeRequest(prompt=prompt)
-            summary = ""
+
+            request = CodeRequest(prompt=final_prompt)
+            final_review = ""
             async with AIService(self.config) as ai_service:
                 async for chunk in ai_service.stream_generate(request):
-                    summary += chunk
-            return summary.strip()
+                    final_review += chunk
+            return final_review.strip()
+
         except UnknownObjectException:
             raise GitHubServiceError(f"Pull Request #{pr_number} not found.")
         except Exception as e:
             raise GitHubServiceError(f"Failed to get PR summary: {e}")
 
     async def get_ai_repo_summary(self) -> str:
-        """NEW: Gets an AI-generated summary of the entire repository."""
+        """Gets an AI-generated summary of the entire repository."""
         repo = await self._get_repo_object()
         try:
-            # Gather context
             repo_context = await self.get_repository_context()
             recent_commits = await self.git_utils.get_recent_commits(Path.cwd(), count=5)
             try:
@@ -158,7 +206,11 @@ class GitHubService:
         """Creates an issue in the repository."""
         repo = await self._get_repo_object()
         try:
-            issue = repo.create_issue(title=title, body=body, labels=labels or [])
+            issue = repo.create_issue(
+                title=title,
+                body=body,
+                labels=labels or []
+            )
             console.print(f"[green]✓ Successfully created Issue #{issue.number}: {issue.html_url}[/green]")
             return issue.html_url
         except GithubException as e:
