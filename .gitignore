@@ -1,8 +1,10 @@
 __pycache__/
 .env
 *.pyc
+*.keep
 *.pyo
 *.pyd
+*.log
 *.egg-info/
 .env*
 ai_assistant.log

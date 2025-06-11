@@ -1,5 +1,5 @@
 # Default model to use if not specified elsewhere. This must match a key under 'models'.
-default_model: "gemma3:27b-it-q4_K_M"
+default_model: "gemma3"
 
 # Common settings to be reused
 common: &common_settings
@@ -38,10 +38,18 @@ common: &common_settings
 
 # Dictionary of all available models. The keys are used to select a model via the CLI.
 models:
-  gemma3:27b-it-q4_K_M:
+  gemma3:
     name: 'gemma3:27b-it-q4_K_M'
     <<: *common_settings
 
-  deepseek-r1:32b:
+  deepseek-r1:
     name: 'deepseek-r1:32b'
+    <<: *common_settings
+  
+  devstral: 
+    name: 'devstral:24b'
+    <<: *common_settings
+  
+  phi4-reasoning:
+    name: 'phi4-reasoning:14b-plus-q8_0'
     <<: *common_settings

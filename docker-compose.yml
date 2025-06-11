@@ -12,7 +12,7 @@ services:
 
   ai_assistant:
     build: .
-    container_name: ai_code_assistant
+    container_name: helios_assistant
     depends_on:
       - ollama
     # Make the assistant talk to the Ollama container on the internal Docker network
