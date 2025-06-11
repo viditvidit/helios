@@ -1,5 +1,7 @@
 from pathlib import Path
 from rich.console import Console
+from InquirerPy import inquirer
+from InquirerPy.base.control import Choice
 from . import display
 from ...utils.file_utils import build_repo_context
 
@@ -26,15 +28,45 @@ def clear_history(session):
     session.conversation_history.clear()
     console.print("[green]✓ Conversation history cleared.[/green]")
 
-def switch_model(session, model_name: str):
-    """Switch AI model."""
-    try:
-        session.config.set_model(model_name)
-        console.print(f"[green]✓ Switched to model: {model_name}[/green]")
-    except Exception as e:
-        console.print(f"[red]Error switching model: {e}[/red]")
-        available = ', '.join(session.config.models.keys())
-        console.print(f"Available models: {available}")
+async def switch_model(session, model_name: str = None):
+    """Switch the AI model used for generation."""
+    if model_name is None:
+        # Show interactive selector
+        available_models = list(session.config.models.keys())
+        current_model = session.config.model_name
+        
+        # Create choices with current model highlighted
+        choices = []
+        for model in available_models:
+            if model == current_model:
+                choices.append(Choice(value=model, name=f"{model} (current)"))
+            else:
+                choices.append(Choice(value=model, name=model))
+        
+        try:
+            selected_model = await inquirer.select(
+                message="Select model:",
+                choices=choices,
+                default=current_model,
+                pointer="→"
+            ).execute_async()
+            
+            if selected_model and selected_model != current_model:
+                session.config.model_name = selected_model
+                console.print(f"[green]✓ Switched to model: {selected_model}[/green]")
+            else:
+                console.print("[yellow]Model selection cancelled or unchanged.[/yellow]")
+                
+        except KeyboardInterrupt:
+            console.print("[yellow]Model selection cancelled.[/yellow]")
+    else:
+        # Direct model switching (legacy support)
+        if model_name in session.config.models:
+            session.config.model_name = model_name
+            console.print(f"[green]✓ Switched to model: {model_name}[/green]")
+        else:
+            available = ", ".join(session.config.models.keys())
+            console.print(f"[red]Model '{model_name}' not found. Available models: {available}[/red]")
 
 def _format_conversation(session) -> str:
     """Helper to format the conversation history for saving."""

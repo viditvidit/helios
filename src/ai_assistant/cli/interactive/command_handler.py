@@ -30,11 +30,12 @@ class CommandHandler:
             elif cmd == 'repo':
                 await actions.show_repository_stats(self.session)
             elif cmd == 'model':
-                if not args:
-                    self.console.print(f"Current model: [bold green]{self.session.config.model_name}[/bold green]")
-                    self.console.print(f"To switch, use: /model <model_name>")
+                if args:
+                    # Legacy support for direct model name
+                    await actions.switch_model(self.session, args[0])
                 else:
-                    actions.switch_model(self.session, args[0])
+                    # Show interactive selector
+                    await actions.switch_model(self.session)
             elif cmd == 'save_conversation' and args:
                 await actions.save_conversation(self.session, args[0])
             elif cmd == 'new' and args:
