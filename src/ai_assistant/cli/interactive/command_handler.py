@@ -55,10 +55,7 @@ class CommandHandler:
             elif cmd == 'git_push':
                 await actions_impl.handle_git_push(self.session)
             elif cmd == 'review':
-                # --- THE FIX ---
-                # Parse flags for /review and pass them to the handler.
                 summary_only = '-s' in args
-                # Default to diff view if no flags or -d is present
                 diff_only = ('-d' in args) or (not summary_only)
                 await actions_impl.handle_repo_review(self.session, summary_only, diff_only)
             elif cmd == 'save_commit' and args:

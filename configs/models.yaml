@@ -1,5 +1,5 @@
 # Default model to use if not specified elsewhere. This must match a key under 'models'.
-default_model: "gemma3"
+default_model: "devstral"
 
 # Common settings to be reused
 common: &common_settings

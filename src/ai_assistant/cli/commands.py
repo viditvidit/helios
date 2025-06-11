@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import List, Optional, Dict
 
 import click
-import questionary
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -74,7 +73,7 @@ class CodeCommands:
 
             staged_diff = await self.git_utils.get_staged_diff(repo_path)
             if not staged_diff:
-                if await questionary.confirm("No staged changes found. Stage all modified files?").ask_async():
+                if click.confirm("No staged changes found. Stage all modified files?"):
                     await self.git_utils.add_all(repo_path)
                     staged_diff = await self.git_utils.get_staged_diff(repo_path)
                     if not staged_diff:
@@ -98,15 +97,14 @@ class CodeCommands:
                     border_style="yellow"
                 ))
             
-            if not await questionary.confirm("Proceed to commit these changes?", default=True).ask_async():
+            if not click.confirm("Proceed to commit these changes?", default=True):
                 console.print("[yellow]Commit aborted.[/yellow]")
                 return
 
-            # THE FIX: Directly prompt the user for the commit message.
-            commit_message = await questionary.text(
-                "Enter commit message:",
-                default="feat: Update project files" # Provide a simple default
-            ).ask_async()
+            # Use click.prompt for commit message input
+            commit_message = click.prompt(
+                "Enter commit message",
+            )
 
             if not commit_message:
                 console.print("[red]Commit message cannot be empty. Aborting.[/red]")
@@ -115,7 +113,7 @@ class CodeCommands:
             await self.git_utils.commit(repo_path, commit_message)
             console.print(f"[green]✓ Changes committed with message: '{commit_message}'[/green]")
 
-            if await questionary.confirm("Push changes to remote?", default=False).ask_async():
+            if click.confirm("Push changes to remote?", default=False):
                 with console.status("[bold yellow]Pushing changes...[/bold yellow]"):
                     branch = await self.git_utils.get_current_branch(repo_path)
                     await self.git_utils.push(repo_path, branch)
