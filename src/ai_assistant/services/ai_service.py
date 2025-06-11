@@ -23,7 +23,7 @@ class AIService:
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def __aenter__(self):
-        timeout = aiohttp.ClientTimeout(total=600, sock_read=120)
+        timeout = aiohttp.ClientTimeout(total=1200, sock_read=120)
         self.session = aiohttp.ClientSession(timeout=timeout)
         return self
 

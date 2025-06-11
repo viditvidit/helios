@@ -122,6 +122,14 @@ async def handle_git_push(session):
         else:
             console.print("[red]Failed to push changes. Check remote configuration and authentication.[/red]")
 
+async def handle_git_switch(session, branch_name: str):
+    git_utils = GitUtils()
+    repo_path = Path.cwd()
+    if not await git_utils.is_git_repo(repo_path): return console.print("[red]This is not a git repository.[/red]")
+    if not branch_name: return console.print("[red]Usage: /git_switch <branch_name>[/red]")
+    if await git_utils.switch_branch(repo_path, branch_name): console.print(f"[green]✓ Switched to branch '{branch_name}'.[/green]")
+    else: console.print(f"[red]Failed to switch to branch '{branch_name}'. Does it exist?[/red]")
+
 async def handle_review(session):
     """Restored /review workflow with the classic [y/N] prompt style."""
     git_utils = GitUtils()

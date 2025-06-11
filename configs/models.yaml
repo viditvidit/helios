@@ -7,7 +7,7 @@ common: &common_settings
   endpoint: 'http://localhost:11434'
   context_length: 70000
   temperature: 0.6
-  timeout: 600
+  timeout: 1200
   system_prompt: |
     You are an expert coding assistant. Your primary function is to modify and generate code based on user requests and provided file context.
 
