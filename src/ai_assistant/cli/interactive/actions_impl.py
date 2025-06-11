@@ -7,6 +7,8 @@ from ...utils.parsing_utils import extract_code_blocks
 from ...core.exceptions import AIAssistantError
 from ..commands import CodeCommands
 import questionary
+from ...cli.commands import CodeCommands
+from . import display
 
 console = Console()
 
@@ -263,80 +265,20 @@ async def handle_git_push(session):
     except Exception as e:
         console.print(f"[red]Error during push: {e}[/red]")
 
-
-async def handle_repo_review(session):
-    """Initiates an interactive review of repository changes."""
-    cmd = CodeCommands(session.config)
+async def handle_repo_review(session, summary_only: bool = False, show_diff: bool = True):
+    """Handle repository review command."""
     try:
-        await cmd.review_changes()
-    except AIAssistantError as e:
-        console.print(f"[red]Error during review: {e}[/red]")
-
-async def handle_apply_changes(session):
-    """Applies all code changes from the last AI response to their respective files."""
-    if not session.last_ai_response_content:
-        console.print("[red]No AI response available to apply changes from.[/red]")
-        return
-
-    code_blocks = extract_code_blocks(session.last_ai_response_content)
-    blocks_to_apply = [block for block in code_blocks if block.get('filename')]
-
-    if not blocks_to_apply:
-        console.print("[yellow]No code blocks with file paths found in the response to apply.[/yellow]")
-        console.print("Tip: You can save a snippet to a new file using: [dim]/save <filename>[/dim]")
-        return
-
-    console.print("\n[bold]The following file changes will be applied:[/bold]")
-    for block in blocks_to_apply:
-        absolute_path = Path.cwd().joinpath(block['filename'])
-        status = "[yellow]new file[/yellow]" if not absolute_path.exists() else "[cyan]overwrite[/cyan]"
-        console.print(f"  - {block['filename']} ({status})")
-
-    console.print("-" * 20)
-    applied_files = []
-    for block in blocks_to_apply:
-        filename = block['filename']
-        code = block['code']
-
-        # THE FIX: Add a sanity check for bogus paths
-        if '<' in filename or '>' in filename:
-            console.print(f"[red]Error: AI returned an invalid filename '{filename}'. Skipping.[/red]")
-            continue
-
-        path = Path.cwd().joinpath(filename)
+        # Create CodeCommands instance and call the review_changes method
+        code_commands = CodeCommands(session.config)
         
-        try:
-            path.relative_to(Path.cwd())
-            await session.file_service.write_file(path, code)
-            relative_path_str = str(path.relative_to(Path.cwd()))
-            session.current_files[relative_path_str] = code
-            console.print(f"[green]✓ Applied changes to {filename}[/green]")
-            applied_files.append(filename)
-        except ValueError:
-            console.print(f"[red]Security Error: Attempted to write to '{path}' which is outside the current project directory. Skipping.[/red]")
-        except Exception as e:
-            console.print(f"[red]Error applying changes to {filename}: {e}[/red]")
-
-    if not applied_files:
-        return
-
-    console.print("\n[green]✓ All detected changes have been applied.[/green]")
-
-    git_utils = GitUtils()
-    if await git_utils.is_git_repo(Path.cwd()):
-        files_str = " ".join(f'"{f}"' for f in applied_files) 
-        console.print(f"\n[bold cyan]Git Actions:[/bold cyan] You can now stage these files with [dim]/git_add {files_str}[/dim] or use [dim]/review[/dim] to commit.")
-
-async def handle_repo_review(session, summary_only: bool, diff_only: bool):
-    """Initiates an interactive review of repository changes with options."""
-    cmd = CodeCommands(session.config)
-    try:
-        # If no flags are set, default to showing the diff.
-        # If -s is set, it takes precedence.
-        show_diff = not summary_only
-        
-        # Call the refactored review_changes method
-        await cmd.review_changes(show_summary=summary_only, show_diff=show_diff)
-
-    except AIAssistantError as e:
-        console.print(f"[red]Error during review: {e}[/red]")
+        if summary_only:
+            # Show only summary, no diff
+            await code_commands.review_changes(show_summary=True, show_diff=False)
+        else:
+            # Show both summary and diff
+            await code_commands.review_changes(show_summary=True, show_diff=show_diff)
+            
+    except Exception as e:
+        display.console.print(f"[red]Error during repository review: {e}[/red]")
+        import traceback
+        display.console.print(f"[dim]{traceback.format_exc()}[/dim]")

@@ -56,8 +56,12 @@ class CommandHandler:
                 await actions_impl.handle_git_push(self.session)
             elif cmd == 'review':
                 summary_only = '-s' in args
-                # Always show both summary and diff unless -s flag is used for summary only
-                await actions_impl.handle_repo_review(self.session, summary_only, not summary_only)
+                if summary_only:
+                    # Show only summary
+                    await actions_impl.handle_repo_review(self.session, summary_only=True, show_diff=False)
+                else:
+                    # Show both summary and diff (default)
+                    await actions_impl.handle_repo_review(self.session, summary_only=False, show_diff=True)
             elif cmd == 'save_commit' and args:
                 if not args:
                     self.console.print("[red]Usage: /save_commit <filename> [commit_message][/red]")

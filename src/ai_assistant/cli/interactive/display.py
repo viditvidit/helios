@@ -2,10 +2,12 @@ from rich.console import Console
 from rich.panel import Panel
 from pyfiglet import Figlet
 from typing import Dict
+import os
 
 console = Console()
 
 def print_helios_banner():
+    os.system('cls' if os.name == 'nt' else 'clear')  # Clear the console
     f = Figlet(font='standard')
     banner = f.renderText('HELIOS')
     console.print(f"[bold orange1]{banner}[/bold orange1]")

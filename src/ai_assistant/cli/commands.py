@@ -13,6 +13,8 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.syntax import Syntax
 from rich.text import Text
+from rich.columns import Columns
+from rich.layout import Layout
 
 from ..core.config import Config
 from ..core.exceptions import AIAssistantError, FileServiceError, NotAGitRepositoryError
@@ -83,30 +85,117 @@ class CodeCommands:
                     console.print("[yellow]No staged changes to review. Aborting.[/yellow]")
                     return
 
-            # Show both summary and diff by default
-            if show_summary:
-                changed_files = await self.git_utils.get_staged_files(repo_path)
+            # Get staged files using multiple methods for reliability
+            changed_files = []
+            try:
+                # Method 1: Try git diff --cached --name-only
+                result = await asyncio.create_subprocess_exec(
+                    'git', 'diff', '--cached', '--name-only',
+                    cwd=repo_path,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await result.communicate()
+                
+                if result.returncode == 0 and stdout.decode().strip():
+                    files = stdout.decode().strip().split('\n')
+                    for file in files:
+                        if file.strip():
+                            changed_files.append(f"📝 {file.strip()}")
+                else:
+                    # Method 2: Try git status --porcelain --cached
+                    result2 = await asyncio.create_subprocess_exec(
+                        'git', 'status', '--porcelain', '--cached',
+                        cwd=repo_path,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout2, stderr2 = await result2.communicate()
+                    
+                    if result2.returncode == 0:
+                        lines = stdout2.decode().strip().split('\n')
+                        for line in lines:
+                            if line.strip():
+                                # Parse git status output: "M  filename" or "A  filename"
+                                status = line[:2]
+                                filename = line[3:].strip()
+                                if status.strip():
+                                    status_icon = "📝" if "M" in status else "📄" if "A" in status else "🗑️" if "D" in status else "📄"
+                                    changed_files.append(f"{status_icon} {filename}")
+                    else:
+                        # Method 3: Extract from diff output
+                        import re
+                        diff_files = re.findall(r'diff --git a/(.*?) b/', staged_diff)
+                        for file in diff_files:
+                            changed_files.append(f"📝 {file}")
+                        
+            except Exception as e:
+                console.print(f"[yellow]Debug: Error getting staged files: {e}[/yellow]")
+                # Fallback: Extract from diff
+                import re
+                diff_files = re.findall(r'diff --git a/(.*?) b/', staged_diff)
+                for file in diff_files:
+                    changed_files.append(f"📝 {file}")
+        
+            # Ensure we have at least something to show
+            if not changed_files and staged_diff:
+                changed_files = ["📝 Changes detected (parsing files...)"]
+        
+            if show_summary and show_diff:
+                # Create layout with two columns
+                layout = Layout()
+                layout.split_row(
+                    Layout(name="files", minimum_size=35),
+                    Layout(name="diff", ratio=2)
+                )
+                
+                # Create files panel
+                if changed_files:
+                    files_content = "\n".join(changed_files)
+                    files_content += f"\n\n📊 Total: {len(changed_files)} files"
+                else:
+                    files_content = "No staged files found"
+                    
+                files_panel = Panel(
+                    files_content,
+                    title="📋 Staged Files",
+                    border_style="cyan",
+                    padding=(1, 1)
+                )
+                layout["files"].update(files_panel)
+                
+                # Create diff panel
+                diff_panel = Panel(
+                    Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True),
+                    title="🔍 Changes Preview",
+                    border_style="green",
+                    padding=(1, 1)
+                )
+                layout["diff"].update(diff_panel)
+                
+                # Display the layout
+                console.print(layout)
+                
+            elif show_summary:
+                # Show only summary
                 console.print(Panel(
-                    "\n".join(f"- {file}" for file in changed_files),
-                    title="Staged Files for Review",
-                    border_style="yellow"
+                    "\n".join(changed_files) if changed_files else "No staged files found",
+                    title="📋 Staged Files",
+                    border_style="cyan"
                 ))
-            
-            if show_diff:
+            elif show_diff:
+                # Show only diff
                 console.print(Panel(
                     Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True),
-                    title="Staged Changes for Review",
-                    border_style="yellow"
+                    title="🔍 Changes Preview",
+                    border_style="green"
                 ))
-            
+        
             if not click.confirm("Proceed to commit these changes?", default=True):
                 console.print("[yellow]Commit aborted.[/yellow]")
                 return
 
-            # Use click.prompt for commit message input
-            commit_message = click.prompt(
-                "Enter commit message"
-            )
+            commit_message = click.prompt("Enter commit message")
 
             if not commit_message:
                 console.print("[red]Commit message cannot be empty. Aborting.[/red]")
