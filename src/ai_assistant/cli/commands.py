@@ -64,7 +64,7 @@ class CodeCommands:
             logger.error(f"Error during code generation: {e}", exc_info=True)
             raise AIAssistantError(f"Failed to generate code: {e}")
 
-    async def review_changes(self, show_summary: bool = False, show_diff: bool = True):
+    async def review_changes(self, show_summary: bool = True, show_diff: bool = True):
         """Review staged changes and optionally commit and push them after verification."""
         repo_path = Path.cwd()
         try:
@@ -83,6 +83,7 @@ class CodeCommands:
                     console.print("[yellow]No staged changes to review. Aborting.[/yellow]")
                     return
 
+            # Show both summary and diff by default
             if show_summary:
                 changed_files = await self.git_utils.get_staged_files(repo_path)
                 console.print(Panel(
@@ -90,7 +91,8 @@ class CodeCommands:
                     title="Staged Files for Review",
                     border_style="yellow"
                 ))
-            elif show_diff:
+            
+            if show_diff:
                 console.print(Panel(
                     Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True),
                     title="Staged Changes for Review",
@@ -103,7 +105,7 @@ class CodeCommands:
 
             # Use click.prompt for commit message input
             commit_message = click.prompt(
-                "Enter commit message",
+                "Enter commit message"
             )
 
             if not commit_message:
