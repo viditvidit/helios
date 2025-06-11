@@ -1,5 +1,6 @@
 from pathlib import Path
 from rich.console import Console
+from rich.panel import Panel
 import questionary
 import asyncio
 
@@ -94,7 +95,6 @@ async def handle_git_add(session, files: list[str]):
     if added_files:
         console.print(f"[green]✓ Staged files: {', '.join(added_files)}[/green]")
 
-
 async def handle_git_commit(session, message: str):
     git_utils = GitUtils()
     repo_path = Path.cwd()
@@ -109,7 +109,6 @@ async def handle_git_commit(session, message: str):
     else:
         console.print("[yellow]Commit failed. Are there any staged changes?[/yellow]")
 
-
 async def handle_git_push(session):
     git_utils = GitUtils()
     repo_path = Path.cwd()
@@ -122,7 +121,6 @@ async def handle_git_push(session):
             console.print(f"[green]✓ Successfully pushed to origin/{current_branch}[/green]")
         else:
             console.print("[red]Failed to push changes. Check remote configuration and authentication.[/red]")
-
 
 async def handle_review(session):
     """Restored /review workflow with the classic [y/N] prompt style."""
@@ -200,7 +198,6 @@ async def handle_review(session):
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error: {e}[/red]")
 
-
 async def handle_create_repo(session):
     """Interactively create a new GitHub repository."""
     try:
@@ -227,7 +224,6 @@ async def handle_create_repo(session):
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error creating repository: {e}[/red]")
 
-
 async def handle_create_branch(session):
     """Interactively create a new GitHub branch."""
     try:
@@ -245,7 +241,6 @@ async def handle_create_branch(session):
 
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error creating branch: {e}[/red]")
-
 
 async def handle_create_pr(session, head_branch_suggestion: str = ""):
     """Interactively create a pull request."""
@@ -277,7 +272,6 @@ async def handle_create_pr(session, head_branch_suggestion: str = ""):
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error creating PR: {e}[/red]")
 
-
 async def handle_create_issue(session):
     """Interactively create a GitHub issue."""
     try:
@@ -295,3 +289,27 @@ async def handle_create_issue(session):
             
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error creating issue: {e}[/red]")
+
+async def handle_repo_summary(session):
+    """New: Handler for the /repo_summary command."""
+    try:
+        service = GitHubService(session.config)
+        with console.status("[bold yellow]Generating AI repository summary...[/bold yellow]"):
+            summary = await service.get_ai_repo_summary()
+        console.print(Panel(summary, title="AI Repository Summary", border_style="blue", expand=True))
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def handle_pr_review(session, pr_number_str: str):
+    """New: Handler for the /pr_review command."""
+    if not pr_number_str or not pr_number_str.isdigit():
+        return console.print("[red]Usage: /pr_review <pr_number>[/red]")
+    
+    pr_number = int(pr_number_str)
+    try:
+        service = GitHubService(session.config)
+        with console.status(f"[bold yellow]Generating AI review for PR #{pr_number}...[/bold yellow]"):
+            summary = await service.get_ai_pr_summary(pr_number)
+        console.print(Panel(summary, title=f"AI Review for PR #{pr_number}", border_style="blue", expand=True))
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")

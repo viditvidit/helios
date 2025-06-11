@@ -7,9 +7,7 @@ class GitUtils:
     """Utility class for Git operations"""
 
     async def get_staged_diff(self, repo_path: Path) -> str:
-        """
-        Retrieves the diff of staged changes for the repository.
-        """
+        """Retrieves the diff of staged changes for the repository."""
         return await self._run_git_command(repo_path, ['diff', '--cached'])
 
     async def get_staged_files(self, repo_path: Path) -> List[str]:
@@ -18,15 +16,35 @@ class GitUtils:
         return [line for line in result.splitlines() if line]
     
     async def get_unstaged_files(self, repo_path: Path) -> List[str]:
-        """
-        Get a list of files that are modified but not staged.
-        This includes untracked files.
-        """
+        """Get a list of files that are modified but not staged."""
         result = await self._run_git_command(repo_path, ['status', '--porcelain'])
-        # Parse the output of git status --porcelain
-        # e.g., ' M file.py', '?? new_file.py'
-        # We just need the file path part
         return [line.strip().split(" ", 1)[1] for line in result.splitlines()]
+
+    async def get_local_branches(self, repo_path: Path) -> List[str]:
+        """Get a list of local branch names."""
+        result = await self._run_git_command(repo_path, ['branch', '--list'])
+        # The output might contain '* ' for the current branch, so we clean it up
+        return [b.replace('*', '').strip() for b in result.splitlines()]
+
+    async def switch_branch(self, repo_path: Path, branch_name: str, create: bool = False) -> bool:
+        """Switches to an existing branch or creates a new one."""
+        command = ['switch']
+        if create:
+            command.append('-c')
+        command.append(branch_name)
+        try:
+            await self._run_git_command(repo_path, command)
+            return True
+        except Exception:
+            return False
+
+    async def pull(self, repo_path: Path) -> bool:
+        """Pulls latest changes for the current branch."""
+        try:
+            await self._run_git_command(repo_path, ['pull'])
+            return True
+        except Exception:
+            return False
 
     async def is_git_repo(self, repo_path: Path) -> bool:
         """Check if the directory is a git repository."""
@@ -42,9 +60,7 @@ class GitUtils:
         return await self._run_git_command(repo_path, ['branch', '-a'])
     
     async def _run_git_command(self, repo_path: Path, command: List[str]) -> str:
-        """
-        Run a git command asynchronously using the safer exec method.
-        """
+        """Runs a git command asynchronously using the safer exec method."""
         try:
             process = await asyncio.create_subprocess_exec(
                 'git', *command,
@@ -52,18 +68,11 @@ class GitUtils:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            
             stdout, stderr = await process.communicate()
-            
             if process.returncode != 0:
-                # Allow certain commands to "fail" gracefully
                 if not (command[0] == 'commit' and b'nothing to commit' in stdout):
-                    raise subprocess.CalledProcessError(
-                        process.returncode, command, output=stdout, stderr=stderr
-                    )
-            
+                    raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
             return stdout.decode('utf-8').strip()
-            
         except FileNotFoundError:
             raise Exception("Git not found. Please install Git and ensure it's in your PATH.")
         except subprocess.CalledProcessError as e:
@@ -114,18 +123,5 @@ class GitUtils:
         try:
             await self._run_git_command(repo_path, command)
             return True
-        except Exception:
-            return False
-
-    async def is_file_tracked(self, repo_path: Path, file_path: str) -> bool:
-        """Check if a file is tracked by git."""
-        result = await self._run_git_command(repo_path, ['ls-files', '--error-unmatch', file_path])
-        return bool(result)
-
-    async def has_uncommitted_changes(self, repo_path: Path, file_path: str = None) -> bool:
-        """Check if there are uncommitted changes for a specific file or repository."""
-        command = ['status', '--porcelain']
-        if file_path:
-            command.append(file_path)
-        result = await self._run_git_command(repo_path, command)
-        return len(result) > 0
+        except Exception as e:
+            raise Exception(f"Failed to push to remote: {e}")

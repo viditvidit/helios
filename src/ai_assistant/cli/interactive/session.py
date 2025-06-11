@@ -81,5 +81,3 @@ class InteractiveSession:
                 display.console.print(f"[red]Unexpected error: {e}[/red]")
                 import traceback
                 display.console.print(f"[dim]{traceback.format_exc()}[/dim]")
-
-        display.console.print("\n[yellow]Exiting Helios. Goodbye![/yellow]")

@@ -19,7 +19,7 @@ def show_welcome():
         "Your repository context is loaded. "
         "Type a request or use a command.\n"
         "Type `/help` for all commands, or `exit` to quit.",
-        title="Chat Mode"
+        title="Helios"
     ))
 
 def show_help():
@@ -31,7 +31,7 @@ def show_help():
   /files                   List files in current context
   /clear                   Clear conversation history
   /refresh                 Refresh repository context
-  /repo                    Show repository statistics
+  /repo                    Show local repository statistics and status
   /model                   Show/switch AI model
   /apply                   Apply all code changes from the last AI response
   /new <filename>          Create a new empty file
@@ -41,12 +41,18 @@ def show_help():
 [bold cyan]Git & GitHub Commands:[/bold cyan]
   /git_add <files...>      Stage one or more files for commit
   /git_commit <message>    Commit staged changes with a message
+  /git_switch <branch>     Switch to a different local branch
+  /git_pull                Pull latest changes for the current branch
   /git_push                Push committed changes to the remote repository
   /review                  Review changes, commit, and optionally create a PR
-  /create_repo             Interactively create a new GitHub repository
-  /create_branch           Interactively create a new GitHub branch
+  /create_branch           Interactively create a new local branch
   /create_pr               Interactively create a new Pull Request
   /create_issue            Interactively create a new GitHub Issue
+  /create_repo             Interactively create a new GitHub repository
+
+[bold cyan]AI-Powered Review Commands:[/bold cyan]
+  /repo_summary            Get an AI-generated summary of the entire repository
+  /pr_review <number>      Get an AI-generated review of a specific Pull Request
 
 [bold cyan]Controls:[/bold cyan]
   Ctrl+C                   Stop current AI response generation
