@@ -18,14 +18,13 @@ class InteractiveSession:
     def __init__(self, config: Config):
         self.config = config
         self.file_service = FileService(config)
-        self.github_service = GitHubService(config, Path.cwd())
+        # Correctly initialize GitHubService with only the config object
+        self.github_service = GitHubService(config)
         
-        # KEY CHANGE: Initialize the vector store to handle context.
         self.vector_store = VectorStore(config)
 
         # State
         self.conversation_history = []
-        # `current_files` is no longer used to hold the entire repo.
         self.current_files = {} 
         self.last_ai_response_content: Optional[str] = None
 
@@ -33,7 +32,6 @@ class InteractiveSession:
         self.command_handler = CommandHandler(self)
         self.chat_handler = ChatHandler(self)
         
-        # Set up signal handlers for Ctrl+C
         signal.signal(signal.SIGINT, self._handle_interrupt)
 
     def _handle_interrupt(self, signum, frame):
@@ -43,13 +41,11 @@ class InteractiveSession:
 
     async def start(self):
         """Start the interactive mode session."""
-        display.print_helios_banner()
+        # The banner is now shown in main.py before model selection.
         display.show_welcome()
 
-        # No longer need to auto-load context. The `helios index` command handles this.
-
-        # Auto-refresh on first startup
         try:
+            # We use /refresh to populate self.current_files
             await self.command_handler.handle("/refresh")
             display.console.print("[green]✓ Repository context initialized[/green]")
         except Exception as e:
@@ -75,12 +71,10 @@ class InteractiveSession:
                     await self.chat_handler.handle(user_input)
 
             except KeyboardInterrupt:
-                # Ctrl+C pressed - stop current generation
                 self.chat_handler.stop_generation()
                 display.console.print("\n[yellow]Use 'exit' or 'quit' to leave the session.[/yellow]")
                 continue
             except EOFError:
-                # Ctrl+D pressed
                 display.show_goodbye()
                 break
             except Exception as e:

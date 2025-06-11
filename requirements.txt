@@ -6,6 +6,7 @@ click
 python-dotenv
 pyfiglet
 PyYAML
+PyGithub
 rich
 questionary
 sentence-transformers

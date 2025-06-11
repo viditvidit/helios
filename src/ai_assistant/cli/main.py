@@ -16,7 +16,9 @@ from ..core.config import Config
 from ..core.exceptions import AIAssistantError, NotAGitRepositoryError, ConfigurationError
 from ..core.logger import setup_logging
 from .commands import CodeCommands
+from .github_commands import github as github_group
 from .interactive.session import InteractiveSession
+from .interactive import display
 from ..utils.git_utils import GitUtils
 from ..utils.file_utils import build_repo_context
 from ..services.vector_store import VectorStore
@@ -83,6 +85,7 @@ def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
         setup_logging(verbose)
 
         if ctx.invoked_subcommand is None:
+            display.print_helios_banner()
             asyncio.run(_run_interactive_mode(ctx.obj))
 
     except ConfigurationError as e:
@@ -182,6 +185,9 @@ async def _review_command(ctx):
     except AIAssistantError as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
+
+# Add the GitHub command group
+cli.add_command(github_group)
 
 def main():
     cli()

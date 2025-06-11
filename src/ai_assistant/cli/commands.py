@@ -35,7 +35,7 @@ class CodeCommands:
         self.config = config
         self.file_service = FileService(config)
         self.file_utils = FileUtils()
-        self.github_service = GitHubService(config, Path.cwd())
+        self.github_service = GitHubService(config)  # Remove the extra Path.cwd() argument
         self.git_utils = GitUtils()
 
     async def get_ai_repo_summary(self, repo_path: Path = None) -> str:

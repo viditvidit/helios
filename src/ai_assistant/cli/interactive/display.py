@@ -41,15 +41,20 @@ def show_help():
   /git_add <files>         Add files to git staging
   /git_commit <message>    Commit staged changes
   /git_push                Push commits to remote
-  /review [-s|-d]          Review staged changes and create a commit.
-                           -s: Show summary of changed files.
-                           -d: Show full diff of changes (default).
+  /review                  Review staged changes and create a commit.
+
+[bold cyan]GitHub Integration:[/bold cyan]
+  /github create_repo <name>         Create a new GitHub repository.
+  /github create_branch <name>       Create a new branch in the current repo.
+  /github review_pr <number>         Get an AI summary of a pull request.
+  /github create_issue <title>       Create a new issue with the given title.
 
 [bold cyan]Controls:[/bold cyan]
   Ctrl+C                   Stop current AI response generation
   exit, quit, bye          Exit the session
 
-[bold green]Tip:[/bold green] After applying changes, use `/review` for a fast commit workflow!
+[bold green]Tip:[/bold green] For more advanced options, use the non-interactive CLI commands like
+`helios github create-pr --help`.
 """
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 

@@ -1,4 +1,5 @@
 from . import actions, display, actions_impl
+from ...services.github_service import GitHubService
 
 class CommandHandler:
     def __init__(self, session):
@@ -62,6 +63,36 @@ class CommandHandler:
                 else:
                     # Show both summary and diff (default)
                     await actions_impl.handle_repo_review(self.session, summary_only=False, show_diff=True)
+            
+            elif cmd == 'github':
+                if not args:
+                    self.console.print("[red]Usage: /github <subcommand> [args...][/red]")
+                    self.console.print("Subcommands: create_repo, create_branch, create_pr, review_pr, create_issue")
+                    return
+                
+                subcommand = args[0]
+                sub_args = args[1:]
+                
+                try:
+                    service = GitHubService(self.session.config)
+                    if subcommand == 'create_repo' and sub_args:
+                        await service.create_repo(repo_name=sub_args[0])
+                    elif subcommand == 'create_branch' and sub_args:
+                        await service.create_branch(branch_name=sub_args[0])
+                    elif subcommand == 'review_pr' and sub_args:
+                        pr_number = int(sub_args[0])
+                        with self.console.status(f"[bold yellow]Getting AI summary for PR #{pr_number}...[/bold yellow]"):
+                            summary = await service.get_ai_pr_summary(pr_number)
+                        self.console.print(Panel(summary, title=f"AI Summary for PR #{pr_number}", border_style="blue"))
+                    elif subcommand == 'create_issue' and sub_args:
+                        title = " ".join(sub_args)
+                        await service.create_issue(title=title, body="Created via Helios AI Assistant.")
+                    else:
+                        self.console.print(f"[red]Unknown or invalid github command: {subcommand}[/red]")
+                        self.console.print("Tip: For more options, use the non-interactive CLI: `helios github --help`")
+                except Exception as e:
+                    self.console.print(f"[red]GitHub command failed: {e}[/red]")
+
             elif cmd == 'save_commit' and args:
                 if not args:
                     self.console.print("[red]Usage: /save_commit <filename> [commit_message][/red]")
