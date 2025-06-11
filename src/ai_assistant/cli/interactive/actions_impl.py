@@ -125,21 +125,24 @@ async def handle_git_push(session):
 
 
 async def handle_review(session):
-    """Restored /review workflow with unstaged changes detection."""
+    """Restored /review workflow with the classic [y/N] prompt style."""
     git_utils = GitUtils()
     repo_path = Path.cwd()
     try:
         if not await git_utils.is_git_repo(repo_path):
             raise NotAGitRepositoryError(path=repo_path)
 
-        # Check for unstaged changes first
         unstaged_changes = await git_utils.get_unstaged_files(repo_path)
         if unstaged_changes:
             console.print("[yellow]Unstaged changes detected:[/yellow]")
             for f in unstaged_changes:
                 console.print(f"  - {f}")
             
-            should_stage = await questionary.confirm("Stage these files before reviewing?").ask_async()
+            should_stage = await questionary.confirm(
+                "Stage these files before reviewing?",
+                default=True,
+                auto_enter=False
+            ).ask_async()
             if should_stage:
                 await git_utils.add_files(repo_path, unstaged_changes)
                 console.print("[green]✓ Staged all detected changes.[/green]")
@@ -154,7 +157,12 @@ async def handle_review(session):
         console.print(Panel(Syntax(staged_diff, "diff", theme="github-dark", word_wrap=True),
                               title="Staged Changes", border_style="green"))
 
-        if not await questionary.confirm("Proceed to commit these changes?").ask_async():
+        should_commit = await questionary.confirm(
+            "Proceed to commit these changes?",
+            default=True,
+            auto_enter=False
+        ).ask_async()
+        if not should_commit:
             console.print("[yellow]Commit aborted.[/yellow]")
             return
 
@@ -166,11 +174,21 @@ async def handle_review(session):
         await git_utils.commit(repo_path, commit_message)
         console.print(f"[green]✓ Changes committed with message: '{commit_message}'[/green]")
 
-        if await questionary.confirm("Create a Pull Request for this commit?").ask_async():
+        should_create_pr = await questionary.confirm(
+            "Create a Pull Request for this commit?",
+            default=True,
+            auto_enter=False
+        ).ask_async()
+        if should_create_pr:
             current_branch = await git_utils.get_current_branch(repo_path)
             if current_branch.lower() in ["main", "master", "develop"]:
                 console.print(f"[yellow]You are on the '{current_branch}' branch. It's recommended to create PRs from a feature branch.[/yellow]")
-                if not await questionary.confirm("Continue anyway?").ask_async():
+                should_continue = await questionary.confirm(
+                    "Continue anyway?",
+                    default=False,
+                    auto_enter=False
+                ).ask_async()
+                if not should_continue:
                     console.print("[yellow]PR creation aborted.[/yellow]")
                     return
 
@@ -194,7 +212,12 @@ async def handle_create_repo(session):
             return console.print("[red]Repository name cannot be empty. Aborting.[/red]")
 
         description = await questionary.text("Description (optional):").ask_async()
-        is_private = await questionary.confirm("Make repository private?", default=True).ask_async()
+        
+        is_private = await questionary.confirm(
+            "Make repository private?",
+            default=True,
+            auto_enter=False
+        ).ask_async()
 
         with console.status(f"Creating repository '{repo_name}' on GitHub..."):
             clone_url = await service.create_repo(repo_name, is_private, description)
