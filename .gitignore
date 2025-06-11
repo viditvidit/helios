@@ -9,3 +9,4 @@ __pycache__/
 .env*
 ai_assistant.log
 .helios
+.DS_Store
