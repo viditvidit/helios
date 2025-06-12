@@ -100,16 +100,15 @@ class ChatHandler:
         This is the correct pattern for use with asyncio.create_task.
         """
         response_content = ""
-        live_panel = Panel(Spinner("dots", text=" Thinking..."), border_style="green")
         
         try:
             async with AIService(self.config) as ai_service:
-                with Live(live_panel, console=console, refresh_per_second=10, vertical_overflow="visible") as live:
+                with Live(Spinner("dots", text=" Thinking..."), console=console, refresh_per_second=10, vertical_overflow="visible") as live:
                     async for chunk in ai_service.stream_generate(request):
                         if self._stop_generation:
                             raise asyncio.CancelledError
                         response_content += str(chunk)
-                        live.update(Panel(Markdown(response_content, code_theme="monokai"), border_style="green", title="AI Assistant"))
+                        live.update(Markdown(response_content, code_theme="monokai"))
             
             self.session.last_ai_response_content = response_content
             self.session.conversation_history.append({"role": "assistant", "content": response_content})
