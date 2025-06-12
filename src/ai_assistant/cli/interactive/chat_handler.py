@@ -69,7 +69,8 @@ class ChatHandler:
                 new_code,
                 filename
             )
-            console.print(Panel(Syntax(diff_text, "diff", theme="github-dark"), title=f"Changes for {filename}"))
+            console.print(Panel(Syntax(diff_text, "diff", theme="monokai"), title=f"Changes for {filename}", 
+                                border_style="#3776A1", title_style="#89CFF1"))
             
             if apply_all:
                 files_to_apply[filename] = new_code
@@ -78,7 +79,14 @@ class ChatHandler:
             choice = await questionary.select(
                 f"Apply changes to {filename}?",
                 choices=["Yes", "No", "Apply All Remaining", "Skip All Remaining"],
-                use_indicator=True
+                use_indicator=True,
+                style=questionary.Style([
+                    ('selected', 'bg:#003A6B #89CFF1'),
+                    ('pointer', '#6EB1D6 bold'),
+                    ('instruction', '#5293BB'),
+                    ('answer', '#89CFF1 bold'),
+                    ('question', '#6EB1D6 bold')
+                ])
             ).ask_async()
 
             if choice == "Yes": files_to_apply[filename] = new_code

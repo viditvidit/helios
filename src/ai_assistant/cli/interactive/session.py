@@ -11,6 +11,8 @@ import questionary
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion, FuzzyCompleter
 from prompt_toolkit.formatted_text import StyleAndTextTuples
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory, Suggestion
+
 from prompt_toolkit.styles import Style
 
 from ...core.config import Config
@@ -28,32 +30,44 @@ console = Console()
 # --- NEW: Custom Completer for file paths ---
 class FilePathCompleter(Completer):
     def __init__(self, file_list: list[str]):
-        # Use a set for fast lookups and to remove duplicates
         self.file_list = sorted(list(set(file_list)))
-        # The fuzzy completer will handle the "type-as-you-filter" logic
-        self.fuzzy_completer = FuzzyCompleter(self)
-
+    
     def get_completions(self, document, complete_event) -> Iterable[Completion]:
-        """Yields all possible file paths for the fuzzy completer to filter."""
-        text_before_cursor = document.text_before_cursor
-        
-        # Only trigger if there's an '@' and no space after it yet
-        if '@' in text_before_cursor:
-            word_before_cursor = document.get_word_before_cursor(WORD=True)
-            if word_before_cursor.startswith('@'):
-                # The word we are completing is after the '@'
-                search_text = word_before_cursor[1:]
-                for path in self.file_list:
+            """Yields all possible file paths for the fuzzy completer to filter."""
+            text_before_cursor = document.text_before_cursor
+            
+            # Only trigger if there's an '@' and no space after it yet
+            if '@' in text_before_cursor:
+                word_before_cursor = document.get_word_before_cursor(WORD=True)
+                if word_before_cursor.startswith('@'):
+                    # The word we are completing is after the '@'
+                    search_text = word_before_cursor[1:]
+                    for path in self.file_list:
+                        yield Completion(
+                            path,
+                            start_position=-len(search_text),
+                            display=path
+                        )
+
+    '''def get_completions(self, document, complete_event):
+        """Return completions for file paths when @ symbol is used."""
+        text = document.text
+        if '@' in text:
+            at_pos = text.rfind('@')
+            search_text = text[at_pos + 1:]
+            
+            for file_path in self.file_list:
+                if file_path.lower().startswith(search_text.lower()):
                     yield Completion(
-                        path,
+                        file_path,
                         start_position=-len(search_text),
-                        display=path,
-                        display_meta="[dim]file/dir[/dim]"
-                    )
+                        display=file_path
+                    )'''
+    
+        
 
 class InteractiveSession:
     """Manages the state and main loop for an interactive chat session."""
-
     def __init__(self, config: Config):
         self.config = config
         self.file_service = FileService(config)
@@ -70,7 +84,6 @@ class InteractiveSession:
         if hasattr(self, 'chat_handler') and self.chat_handler._generation_task and not self.chat_handler._generation_task.done():
             self.chat_handler.stop_generation()
         else:
-            # If no AI task is running, this allows Ctrl+C to exit the prompt
             raise KeyboardInterrupt
 
     async def _setup_working_directory(self):
@@ -108,12 +121,10 @@ class InteractiveSession:
 
         # Custom styles for the autocomplete menu
         style = Style.from_dict({
-            'completion-menu.completion.current': 'bg:#00aaaa #000000', # Selected item
-            'completion-menu.completion': 'bg:#008888 #ffffff',      # Other items
-            'completion-menu.meta.completion.current': 'bg:#00aaaa #000000',
-            'completion-menu.meta.completion': 'bg:#008888 #eeeeee',
-            'scrollbar.background': 'bg:#88aaaa',
-            'scrollbar.button': 'bg:#222222',
+            'completion-menu.completion.current': 'bg:#333333 #ffffff', # Selected item
+            'completion-menu.completion': 'bg:#1a1a1a #666666',      # Other items
+            'completion-menu.meta.completion.current': 'bg:#333333 #cccccc',
+            'completion-menu.meta.completion': 'bg:#1a1a1a #444444'
         })
 
         prompt_session = PromptSession(
@@ -124,7 +135,7 @@ class InteractiveSession:
 
         while True:
             try:
-                user_input = await prompt_session.prompt_async("\nYou: ")
+                user_input = await prompt_session.prompt_async("> ")
                 
                 if not user_input.strip(): continue
                 if user_input.lower() in ['exit', 'quit', 'bye']: display.show_goodbye(); break
