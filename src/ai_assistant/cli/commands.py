@@ -6,6 +6,7 @@ import logging
 import re
 from pathlib import Path
 from typing import List, Optional, Dict
+import signal
 
 import click
 from rich.console import Console
@@ -25,6 +26,11 @@ from ..utils.git_utils import GitUtils
 console = Console()
 logger = logging.getLogger(__name__)
 
+_should_stop = False
+def _signal_handler(signum, frame):
+    global _should_stop
+    _should_stop = True
+
 class CodeCommands:
     """Implementation of code-related commands"""
 
@@ -37,27 +43,33 @@ class CodeCommands:
 
     async def generate_code(self, prompt: str, files: List[str],
                           show_diff: bool = False, apply_changes: bool = False):
-        """Generate or modify code based on a prompt and file context."""
+        global _should_stop
+        _should_stop = False
+        # Register the signal handler for this command run
+        original_handler = signal.signal(signal.SIGINT, _signal_handler)
+        
         try:
             request = await self._prepare_request(prompt, files)
 
             async with AIService(self.config) as ai_service:
                 response_content = ""
-                with Progress(
-                    SpinnerColumn(),
-                    TextColumn("[progress.description]{task.description}"),
-                    transient=True,
-                    console=console,
-                ) as progress:
-                    progress.add_task(f"Asking {self.config.get_current_model().name}...", total=None)
+                with Progress(...) as progress:
+                    # ...
                     async for chunk in ai_service.stream_generate(request):
+                        if _should_stop:
+                            console.print("\n[yellow]Code generation stopped by user.[/yellow]")
+                            break
                         response_content += chunk
-
-                await self._display_and_process_response(response_content, show_diff, apply_changes)
+                
+                if not _should_stop:
+                    await self._display_and_process_response(response_content, show_diff, apply_changes)
 
         except Exception as e:
             logger.error(f"Error during code generation: {e}", exc_info=True)
             raise AIAssistantError(f"Failed to generate code: {e}")
+        finally:
+            # Restore the original signal handler
+            signal.signal(signal.SIGINT, original_handler)
 
     async def _prepare_request(self, prompt: str, files: List[str]) -> CodeRequest:
         """Prepare AI request with file context."""

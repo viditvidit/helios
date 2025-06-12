@@ -32,7 +32,9 @@ class CommandHandler:
             elif cmd == 'git_switch': await actions_impl.handle_git_switch(self.session, args[0] if args else "")
             elif cmd == 'git_pull': await actions_impl.handle_git_pull(self.session)
             elif cmd == 'git_push': await actions_impl.handle_git_push(self.session)
-            elif cmd == 'review': await actions_impl.handle_review(self.session)
+            elif cmd == 'review':
+                show_diff = '-d' in args
+                await actions_impl.handle_review(self.session, show_diff=show_diff)
             elif cmd == 'create_branch': await actions_impl.handle_create_branch(self.session)
             elif cmd == 'create_pr': await actions_impl.handle_create_pr(self.session)
             elif cmd == 'create_issue': await actions_impl.handle_create_issue(self.session)

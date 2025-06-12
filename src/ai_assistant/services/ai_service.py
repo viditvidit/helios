@@ -7,6 +7,7 @@ import json
 from typing import Optional, AsyncGenerator, List, Dict
 
 import aiohttp
+from rich.text import Text
 
 from ..core.config import Config
 from ..core.exceptions import AIServiceError
@@ -23,7 +24,8 @@ class AIService:
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def __aenter__(self):
-        timeout = aiohttp.ClientTimeout(total=1200, sock_read=120)
+        # Increased timeout for potentially long AI operations like reviews
+        timeout = aiohttp.ClientTimeout(total=self.model_config.timeout)
         self.session = aiohttp.ClientSession(timeout=timeout)
         return self
 
@@ -39,25 +41,15 @@ class AIService:
         """
         messages = []
 
-        # 1. System Prompt: Contains the core instructions and formatting rules.
         if self.model_config.system_prompt:
-            messages.append({
-                "role": "system",
-                "content": self.model_config.system_prompt
-            })
+            messages.append({"role": "system", "content": self.model_config.system_prompt})
 
-        # 2. User Prompt: Contains all the data - context, history, and the final request.
         user_prompt_parts = []
-
-        # Add the full repository file tree for structural context.
         if request.repository_files:
             tree_str = build_file_tree(request.repository_files)
             user_prompt_parts.append("This is the file structure of the project for your reference:")
-            user_prompt_parts.append("--- REPOSITORY FILE TREE ---")
-            user_prompt_parts.append(tree_str)
-            user_prompt_parts.append("--- END REPOSITORY FILE TREE ---")
+            user_prompt_parts.append(f"--- REPOSITORY FILE TREE ---\n{tree_str}\n--- END REPOSITORY FILE TREE ---")
 
-        # Add conversation history.
         history_to_include = request.conversation_history[:-1]
         if history_to_include:
             user_prompt_parts.append("\n--- Previous Conversation ---")
@@ -65,39 +57,28 @@ class AIService:
                 user_prompt_parts.append(f"{turn['role'].capitalize()}: {turn['content']}")
             user_prompt_parts.append("--- End of Previous Conversation ---")
 
-        # Add relevant file context from RAG
         if request.files:
-            user_prompt_parts.append("\n--- Relevant File Context (from semantic search) ---")
+            user_prompt_parts.append("\n--- Relevant File Context ---")
             for file_path, content in request.files.items():
                 user_prompt_parts.append(f"START OF FILE: {file_path}\n{content}\nEND OF FILE: {file_path}")
             user_prompt_parts.append("--- End of File Context ---")
 
-        # Add the actual, current user request at the very end.
         user_prompt_parts.append(f"\nMy Request: {request.prompt}")
         
         user_prompt_content = "\n\n".join(user_prompt_parts)
-        
-        messages.append({
-            "role": "user",
-            "content": user_prompt_content
-        })
+        messages.append({"role": "user", "content": user_prompt_content})
 
         return messages
 
     async def stream_generate(self, request: CodeRequest) -> AsyncGenerator[str, None]:
-        if self.model_config.type == 'ollama':
-            async for chunk in self._stream_ollama_chat(request):
-                yield chunk
-        else:
+        """Streams a response, formatting 'thinking' steps as dim text."""
+        if self.model_config.type != 'ollama':
             raise AIServiceError(f"Unsupported streaming model type: {self.model_config.type}")
 
-    async def _stream_ollama_chat(self, request: CodeRequest) -> AsyncGenerator[str, None]:
-        """Streams a response from the Ollama /api/chat endpoint."""
         if not self.session or self.session.closed:
             raise AIServiceError("AIOHTTP session is not active.")
 
         messages = self._build_chat_messages(request)
-        
         payload = {
             "model": self.model_config.name,
             "messages": messages,
@@ -108,7 +89,6 @@ class AIService:
                 "num_predict": self.model_config.max_tokens,
             }
         }
-        
         url = f"{self.model_config.endpoint}/api/chat"
 
         try:
@@ -118,15 +98,21 @@ class AIService:
                     raise AIServiceError(f"Ollama API error ({response.status}): {error_text}")
                 
                 async for line in response.content:
-                    if line:
-                        try:
-                            data = json.loads(line.decode('utf-8'))
-                            if 'message' in data and 'content' in data['message']:
-                                yield data['message']['content']
-                            if data.get('done', False):
-                                break
-                        except json.JSONDecodeError:
-                            continue
+                    if not line: continue
+                    try:
+                        data = json.loads(line.decode('utf-8'))
+                        if 'message' in data and 'content' in data['message']:
+                            content = data['message']['content']
+                            # Check for "thinking" markers. You can customize these markers.
+                            # If your system_prompt asks the AI to start thoughts with "Thinking:", this will work.
+                            if content.strip().startswith("Thinking:"):
+                                yield str(Text(content, style="dim"))
+                            else:
+                                yield content
+                        if data.get('done'):
+                            break
+                    except json.JSONDecodeError:
+                        continue # Ignore malformed JSON lines
         except asyncio.TimeoutError:
             raise AIServiceError("Request to Ollama timed out. The model may be taking too long to respond.")
         except aiohttp.ClientError as e:
