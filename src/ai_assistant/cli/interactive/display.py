@@ -8,12 +8,13 @@ console = Console()
 
 def print_helios_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
-    f = Figlet(font='standard')
+    f = Figlet(font='smkeyboard')
     banner = f.renderText('HELIOS')
     console.print(f"[bold orange1]{banner}[/bold orange1]")
     console.print("[bold]Your AI Coding Companion[/bold]\n")
 
 def show_welcome():
+    print_helios_banner()
     console.print(Panel.fit(
         "[bold green]Welcome to the Interactive AI Assistant[/bold green]\n"
         "Your repository context is loaded. "

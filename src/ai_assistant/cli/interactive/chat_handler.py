@@ -33,73 +33,68 @@ class ChatHandler:
         return re.findall(pattern, message)
 
     def _resolve_filename_to_full_path(self, filename: str) -> Optional[str]:
-        """
-        Searches the indexed file manifest to find the full relative path for a given base filename.
-        """
+        """Searches the indexed file manifest to find the full relative path for a given filename."""
         if self._indexed_file_paths is None:
             if self.session.vector_store.metadata:
                 self._indexed_file_paths = {item['file_path'] for item in self.session.vector_store.metadata}
-            else:
-                self._indexed_file_paths = set()
-
+            else: self._indexed_file_paths = set()
         basename = Path(filename).name
         matches = [p for p in self._indexed_file_paths if p.endswith(f'/{basename}') or p == basename]
-        
-        if len(matches) == 1:
-            return matches[0]
+        if len(matches) == 1: return matches[0]
         elif len(matches) > 1:
             self.console.print(f"[yellow]Ambiguous file mention: '{basename}' matched {len(matches)} files. Please be more specific.[/yellow]")
             return None
         return None
 
     async def handle(self, message: str):
-        """Handle a user's chat message using the RAG pipeline."""
+        """
+        Handles a user's chat message using a hybrid context strategy for speed and accuracy.
+        """
         try:
             self._stop_generation = False
-            
-            # 1. Force-load files explicitly mentioned in the prompt.
+            final_context_files = {}
+
+            # --- Stage 1: Prioritize Explicitly Mentioned Files ---
+            # These are always included in full.
             mentioned_files = self._extract_filenames_from_message(message)
-            direct_context_files = {}
             if mentioned_files:
                 self.console.print(f"[dim]Found file mentions: {', '.join(mentioned_files)}[/dim]")
-                for mentioned_file in mentioned_files:
-                    full_path = self._resolve_filename_to_full_path(mentioned_file)
-                    
+                for file_path_str in mentioned_files:
+                    full_path = self._resolve_filename_to_full_path(file_path_str)
                     if full_path:
                         try:
-                            content = await self.session.file_service.read_file(full_path)
-                            direct_context_files[full_path] = content
-                            self.console.print(f"[dim]Loaded context for: {full_path}[/dim]")
+                            content = await self.session.file_service.read_file(Path(full_path))
+                            final_context_files[full_path] = content
+                            self.console.print(f"[dim]Loaded full context for: {full_path}[/dim]")
                         except Exception as e:
-                            self.console.print(f"[yellow]Warning: Could not read resolved file '{full_path}': {e}[/yellow]")
+                            self.console.print(f"[yellow]Warning: Could not read file '{full_path}': {e}[/yellow]")
                     else:
-                        self.console.print(f"[yellow]Warning: Could not find '{mentioned_file}' in the project index.[/yellow]")
+                        self.console.print(f"[yellow]Warning: Could not find '{file_path_str}' in the project index.[/yellow]")
 
-            # 2. Retrieve relevant context from the vector store for semantic search.
-            with self.console.status("[dim]Searching for semantic context...[/dim]"):
-                relevant_chunks = self.session.vector_store.search(message)
+            # --- Stage 2: Use Semantic Search for Supplemental Context ---
+            # Find relevant snippets from the rest of the repository.
+            with self.console.status("[dim]Searching for relevant code snippets...[/dim]", spinner="aesthetic"):
+                relevant_chunks = self.session.vector_store.search(message, k=10)
 
-            # 3. Assemble the context, prioritizing explicitly mentioned files.
-            context_files = {}
             for chunk in relevant_chunks:
                 file_path = chunk['file_path']
-                if file_path not in context_files:
-                    context_files[file_path] = ""
-                context_files[file_path] += f"... (context from {file_path}) ...\n" + chunk['text'] + "\n\n"
+                # Add the snippet only if the entire file wasn't already included
+                if file_path not in final_context_files:
+                    if file_path not in final_context_files:
+                        final_context_files[file_path] = "" # Initialize if new
+                    # Append snippet with context marker
+                    final_context_files[file_path] += f"\n... (Relevant Snippet) ...\n{chunk['text']}\n"
             
-            context_files.update(direct_context_files)
-
-            if not context_files and not direct_context_files:
+            if not final_context_files:
                 self.console.print("[yellow]Could not find specific context. The AI will answer from general knowledge.[/yellow]")
-            
-            # 4. Add user's message to history and create the request
+
+            # --- Stage 3: Assemble the Final Request ---
             self.session.conversation_history.append({"role": "user", "content": message})
             
             request = CodeRequest(
                 prompt=message,
-                files=context_files,
-                # Pass the list of all files in the current context for the tree view
-                repository_files=list(self.session.current_files.keys()),
+                files=final_context_files, # The combined, intelligent context
+                repository_files=list(self.session.current_files.keys()), # The full file list for the tree view
                 conversation_history=self.session.conversation_history.copy(),
             )
 
@@ -117,7 +112,7 @@ class ChatHandler:
         """Stream AI response and handle post-response actions."""
         response_content = ""
         is_first_chunk = True
-        spinner = Spinner("dots", text=" Thinking...")
+        spinner = Spinner("bouncingBall", text=" Thinking...")
         live_panel = Panel(spinner, border_style="green", title="AI Assistant (Press Ctrl+C to stop)", title_align="left")
 
         try:
@@ -126,18 +121,12 @@ class ChatHandler:
                     async for chunk in ai_service.stream_generate(request):
                         if self._stop_generation:
                             raise asyncio.CancelledError("Generation stopped by user")
-                            
                         if is_first_chunk:
                             response_content = chunk.lstrip()
                             is_first_chunk = False
                         else:
                             response_content += chunk
-                        
-                        markdown_view = Markdown(
-                            response_content,
-                            code_theme="monokai",
-                            inline_code_theme="monokai"
-                        )
+                        markdown_view = Markdown(response_content, code_theme="monokai", inline_code_theme="monokai")
                         live.update(Panel(markdown_view, border_style="green", title="AI Assistant (Press Ctrl+C to stop)", title_align="left"))
             
             if is_first_chunk and not self._stop_generation:
@@ -147,7 +136,6 @@ class ChatHandler:
             if not self._stop_generation:
                 self.session.last_ai_response_content = response_content
                 self.session.conversation_history.append({"role": "assistant", "content": response_content})
-
                 code_blocks = extract_code_blocks(response_content)
                 if code_blocks:
                     display.show_code_suggestions()
@@ -159,11 +147,7 @@ class ChatHandler:
             raise
         except Exception as e:
             if "timed out" in str(e).lower():
-                self.console.print(Panel(
-                    "[yellow]⏱️ The AI model is taking longer than expected to respond.[/yellow]",
-                    border_style="yellow",
-                    title="Timeout"
-                ))
+                self.console.print(Panel("[yellow]⏱️ The AI model is taking longer than expected to respond.[/yellow]", border_style="yellow", title="Timeout"))
             else:
                 self.console.print(f"[red]Error generating AI response: {e}[/red]")
                 import traceback
