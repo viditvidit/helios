@@ -6,6 +6,14 @@ from typing import List, Dict
 class GitUtils:
     """Utility class for Git operations"""
 
+    async def init_repo(self, repo_path: Path):
+        """Initializes a new Git repository in the specified path."""
+        try:
+            await self._run_git_command(repo_path, ['init'])
+            return True
+        except Exception:
+            return False
+
     async def get_staged_diff(self, repo_path: Path) -> str:
         """Retrieves the entire diff of staged changes as a single string."""
         return await self._run_git_command(repo_path, ['diff', '--cached'])
