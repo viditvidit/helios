@@ -45,7 +45,8 @@ def show_help():
   /git_switch <branch>     Switch to a different local branch
   /git_pull                Pull latest changes for the current branch
   /git_push                Push committed changes to the remote repository
-  /review                  Review changes, commit, and optionally create a PR
+  /review [-d]             Review changes, commit, and optionally create a PR.
+                           (Use -d for a detailed, full diff view).
   /create_branch           Interactively create a new local branch
   /create_pr               Interactively create a new Pull Request
   /create_issue            Interactively create a new GitHub Issue

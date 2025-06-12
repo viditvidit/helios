@@ -1,6 +1,9 @@
 import questionary
 
 from ...logic import file_logic, git_logic, github_logic
+from rich.console import Console
+
+console = Console()
 
 # --- File Operations ---
 async def handle_new_file(session, file_path: str):
@@ -29,7 +32,7 @@ async def handle_git_push(session):
     await git_logic.push()
 
 async def handle_review(session, show_diff: bool = False):
-    """Dispatcher for the review and commit workflow."""
+    """Dispatcher for the review and commit workflow. Correctly passes show_diff."""
     commit_success = await git_logic.review_and_commit(show_diff=show_diff)
     if commit_success:
         if await questionary.confirm("Create a Pull Request for this commit?", default=True, auto_enter=False).ask_async():
