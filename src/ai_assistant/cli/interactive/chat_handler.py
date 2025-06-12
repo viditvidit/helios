@@ -50,8 +50,49 @@ class ChatHandler:
         return None
 
     async def _handle_code_response(self, response_content: str):
-        # ... (This method is unchanged from the previous correct version)
-        pass
+        """Interactively handles code blocks in the AI's response."""
+        code_blocks = [b for b in extract_code_blocks(response_content) if b.get('filename')]
+        if not code_blocks: return
+
+        console.print("\n[bold cyan]AI has suggested code changes. Reviewing now...[/bold cyan]")
+        
+        files_to_apply = {}
+        apply_all, skip_all = False, False
+
+        for block in code_blocks:
+            if skip_all: break
+            filename, new_code = block['filename'], block['code']
+            file_path = Path.cwd() / filename
+            
+            diff_text = FileUtils.generate_diff(
+                await self.session.file_service.read_file(file_path) if file_path.exists() else "",
+                new_code,
+                filename
+            )
+            console.print(Panel(Syntax(diff_text, "diff", theme="github-dark"), title=f"Changes for {filename}"))
+            
+            if apply_all:
+                files_to_apply[filename] = new_code
+                continue
+
+            choice = await questionary.select(
+                f"Apply changes to {filename}?",
+                choices=["Yes", "No", "Apply All Remaining", "Skip All Remaining"],
+                use_indicator=True
+            ).ask_async()
+
+            if choice == "Yes": files_to_apply[filename] = new_code
+            elif choice == "Apply All Remaining": apply_all = True; files_to_apply[filename] = new_code
+            elif choice == "Skip All Remaining": skip_all = True
+        
+        if not files_to_apply: return console.print("[yellow]No changes were applied.[/yellow]")
+
+        for filename, code in files_to_apply.items():
+            try:
+                await self.session.file_service.write_file(Path.cwd() / filename, code)
+                console.print(f"[green]✓ Applied changes to {filename}[/green]")
+            except Exception as e:
+                console.print(f"[red]Error applying changes to {filename}: {e}[/red]")
 
     async def _stream_and_process_response(self, request: CodeRequest):
         """
