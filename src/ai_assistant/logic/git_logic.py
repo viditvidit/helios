@@ -101,7 +101,6 @@ async def review_and_commit(show_diff: bool = False) -> tuple[bool, str]:
             console.print("[yellow]No staged changes to review.[/yellow]")
             return False, ""
 
-        console.print(Panel(f"[bold]Found changes in {len(per_file_diffs)} file(s).[/bold]", border_style="cyan"))
         if show_diff:
             for filename, diff_content in per_file_diffs.items():
                 console.print(Panel(Syntax(diff_content, "diff", theme="github-dark", word_wrap=True), title=f"{filename}"))
