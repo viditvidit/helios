@@ -1,7 +1,9 @@
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 import questionary
+from typing import List, Optional
 
 from ..services.github_service import GitHubService
 from ..utils.git_utils import GitUtils
@@ -114,5 +116,160 @@ async def pr_review(session, pr_number_str: str):
         with console.status(f"[yellow]Generating AI review for PR #{pr_number}...[/yellow]"):
             summary = await service.get_ai_pr_summary(pr_number)
         console.print(Panel(summary, title=f"AI Review for PR #{pr_number}", border_style="blue", expand=True))
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def approve_pr(session, pr_number_str: str):
+    """Logic to approve a PR."""
+    if not pr_number_str or not pr_number_str.isdigit():
+        return console.print("[red]Usage: /pr_approve <pr_number>[/red]")
+    pr_number = int(pr_number_str)
+    try:
+        service = GitHubService(session.config)
+        with console.status(f"Approving PR #{pr_number}..."):
+            await service.approve_pr(pr_number)
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def comment_on_pr(session, pr_number_str: str):
+    """Logic to comment on a PR."""
+    if not pr_number_str or not pr_number_str.isdigit():
+        return console.print("[red]Usage: /pr_comment <pr_number>[/red]")
+    pr_number = int(pr_number_str)
+    try:
+        comment = await questionary.text("Enter your comment (markdown supported):").ask_async()
+        if not comment:
+            return console.print("[yellow]Comment cancelled.[/yellow]")
+        service = GitHubService(session.config)
+        with console.status(f"Posting comment to PR #{pr_number}..."):
+            await service.comment_on_pr(pr_number, comment)
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def merge_pr(session, pr_number_str: str):
+    """Logic to merge a PR."""
+    if not pr_number_str or not pr_number_str.isdigit():
+        return console.print("[red]Usage: /pr_merge <pr_number>[/red]")
+    pr_number = int(pr_number_str)
+    try:
+        method = await questionary.select(
+            "Select merge method:",
+            choices=["merge", "squash", "rebase"],
+            default="merge"
+        ).ask_async()
+        
+        service = GitHubService(session.config)
+        with console.status(f"Merging PR #{pr_number}..."):
+            await service.merge_pr(pr_number, method)
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def list_issues(session, assignee_filter: Optional[str]):
+    """Logic to list open issues with a smart default filter."""
+    try:
+        service = GitHubService(session.config)
+        
+        # --- NEW DEFAULT LOGIC ---
+        # If no filter is provided, default to '*' (any assigned issue).
+        # This is more useful than showing everything including unassigned issues.
+        if assignee_filter is None:
+            assignee_filter = '*'
+
+        # Build user-friendly text for the status message
+        filter_text = ""
+        if assignee_filter:
+            if assignee_filter.lower() == 'none':
+                filter_text = " (Unassigned)"
+            elif assignee_filter == '*':
+                filter_text = " (Assigned to anyone)"
+            else:
+                filter_text = f" (Assigned to '{assignee_filter}')"
+
+        with console.status(f"Fetching open issues{filter_text}..."):
+            issues = await service.get_issues(assignee_filter=assignee_filter)
+        
+        if not issues.totalCount:
+            return console.print(f"[yellow]No open issues found{filter_text}.[/yellow]")
+
+        table = Table(title=f"Open GitHub Issues{filter_text}")
+        table.add_column("#", style="cyan")
+        table.add_column("Title", style="magenta")
+        table.add_column("Assignees", style="green")
+        table.add_column("URL", style="dim")
+
+        for issue in issues:
+            assignees = ", ".join([a.login for a in issue.assignees]) or "[dim]None[/dim]"
+            table.add_row(str(issue.number), issue.title, assignees, issue.html_url)
+        
+        console.print(table)
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+        console.print(f"[red]Error: {e}[/red]")
+
+async def list_prs(session):
+    """Logic to list open pull requests."""
+    try:
+        service = GitHubService(session.config)
+        with console.status("Fetching open pull requests..."):
+            prs = await service.get_open_prs()
+
+        if not prs.totalCount:
+            return console.print("[yellow]No open pull requests found.[/yellow]")
+            
+        table = Table(title="Open Pull Requests")
+        table.add_column("#", style="cyan")
+        table.add_column("Title", style="magenta")
+        table.add_column("Author", style="green")
+        table.add_column("URL", style="dim")
+
+        for pr in prs:
+            table.add_row(str(pr.number), pr.title, pr.user.login, pr.html_url)
+        
+        console.print(table)
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def close_issue(session, issue_number_str: str, comment: str):
+    if not issue_number_str or not issue_number_str.isdigit():
+        return console.print("[red]Usage: /issue_close <number> [comment...][/red]")
+    try:
+        service = GitHubService(session.config)
+        await service.close_issue(int(issue_number_str), comment)
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def comment_on_issue(session, issue_number_str: str, comment: str):
+    if not issue_number_str or not issue_number_str.isdigit():
+        return console.print("[red]Usage: /issue_comment <number> <comment...>[/red]")
+    try:
+        service = GitHubService(session.config)
+        await service.comment_on_issue(int(issue_number_str), comment)
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def assign_issue(session, issue_number_str: str, assignee: str):
+    if not issue_number_str or not issue_number_str.isdigit() or not assignee:
+        return console.print("[red]Usage: /issue_assign <number> <username>[/red]")
+    try:
+        service = GitHubService(session.config)
+        await service.assign_issue(int(issue_number_str), assignee)
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def link_pr_to_issue(session, pr_number_str: str, issue_number_str: str):
+    if not pr_number_str or not pr_number_str.isdigit() or not issue_number_str or not issue_number_str.isdigit():
+        return console.print("[red]Usage: /pr_link_issue <pr_number> <issue_number>[/red]")
+    try:
+        service = GitHubService(session.config)
+        await service.link_pr_to_issue(int(pr_number_str), int(issue_number_str))
+    except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
+
+async def request_pr_reviewers(session, pr_number_str: str, reviewers: List[str]):
+    if not pr_number_str or not pr_number_str.isdigit() or not reviewers:
+        return console.print("[red]Usage: /pr_request_review <pr_number> <user1> [user2]...[/red]")
+    try:
+        service = GitHubService(session.config)
+        await service.request_pr_reviewers(int(pr_number_str), reviewers)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error: {e}[/red]")

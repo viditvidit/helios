@@ -1,5 +1,8 @@
 from rich.console import Console
 from rich.panel import Panel
+from rich.text import Text
+from rich.table import Table
+from rich.columns import Columns
 from pyfiglet import Figlet
 from typing import Dict
 import os
@@ -32,32 +35,45 @@ def show_help():
   /files                   List files in current context
   /clear                   Clear conversation history
   /refresh                 Refresh repository context
+  /index                   Manually re-index the entire repository.
   /repo                    Show local repository statistics and status
   /model                   Show/switch AI model
   /apply                   Apply all code changes from the last AI response
   /new <filename>          Create a new empty file
   /save <filename>         Save the last AI code response to a specific file
-  /save_conversation <file> Save conversation to a markdown file
 
-[bold cyan]Git & GitHub Commands:[/bold cyan]
+[bold cyan]Local Git Commands:[/bold cyan]
   /git_add <files...>      Stage one or more files for commit
   /git_commit <message>    Commit staged changes with a message
   /git_switch <branch>     Switch to a different local branch
+  /git_log                 Show recent commit history
   /git_pull                Pull latest changes for the current branch
   /git_push                Push committed changes to the remote repository
-  /review                  Review changes, commit, and optionally create a PR
-  /create_branch           Interactively create a new local branch
-  /create_pr               Interactively create a new Pull Request
-  /create_issue            Interactively create a new GitHub Issue
+  
+[bold cyan]GitHub Workflow Commands:[/bold cyan]
+  /review [-d]             Review changes, commit, push, and create a PR.
   /create_repo             Interactively create a new GitHub repository
+  /create_branch           Interactively create a new local branch
+  /create_issue            Interactively create a new GitHub Issue
+  /issue_list [--filter <user|none|all>]  List open issues.
+                           (Default: shows all assigned issues).
+                           <user>: issues for a specific user.
+                           'none': unassigned issues.
+                           'all': all issues, assigned or not.
+  /issue_comment <#> <text> Add a comment to an issue.
+  /issue_assign <#> <user> Assign an issue to a user.
+  /issue_close <#> [text]  Close an issue, optionally with a comment.
+  /create_pr               Interactively create a new Pull Request
+  /pr_list                 List open Pull Requests.
+  /pr_link_issue <pr#> <iss#> Link a PR to an issue.
+  /pr_request_review <pr#> <user..> Request reviews for a PR.
+  /pr_approve <#>          Approve a Pull Request.
+  /pr_comment <#>          Add a comment to a Pull Request.
+  /pr_merge <#>            Merge a Pull Request.
 
 [bold cyan]AI-Powered Review Commands:[/bold cyan]
-  /repo_summary            Get an AI-generated summary of the entire repository
-  /pr_review <number>      Get an AI-generated review of a specific Pull Request
-
-[bold cyan]Controls:[/bold cyan]
-  Ctrl+C                   Stop current AI response generation
-  exit, quit, bye          Exit the session
+  /repo_summary            Get an AI-generated summary of the entire repository.
+  /pr_review <#>           Get an AI-generated review of a specific Pull Request.
 """
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 
@@ -71,7 +87,6 @@ def list_files_in_context(current_files: Dict[str, str]):
     panel_content = f"Total: {file_count} files, {total_lines} lines\n\n"
     panel_content += "\n".join(files_info)
     console.print(Panel(panel_content, title="Files in Context", border_style="blue"))
-
 
 def show_repo_stats(repo_context: Dict[str, str], git_context: Dict):
     from pathlib import Path
@@ -90,7 +105,7 @@ def show_repo_stats(repo_context: Dict[str, str], git_context: Dict):
 [bold]Git Status:[/bold]
 [dim]{git_context.get('status', 'N/A') or 'No changes detected'}[/dim]
 """
-    console.print(Panel(stats_text, title="Repository Overview", border_style="blue"))
+    console.print(Panel(stats_text, title="Repository Overview", border_style="blue"))    
 
 def show_code_suggestions():
     suggestion_message = (

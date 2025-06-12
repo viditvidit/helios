@@ -1,14 +1,29 @@
 import asyncio
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 class GitUtils:
     """Utility class for Git operations"""
 
     async def get_staged_diff(self, repo_path: Path) -> str:
-        """Retrieves the diff of staged changes for the repository."""
+        """Retrieves the entire diff of staged changes as a single string."""
         return await self._run_git_command(repo_path, ['diff', '--cached'])
+
+    async def get_staged_diff_by_file(self, repo_path: Path) -> Dict[str, str]:
+        """
+        Retrieves staged changes and returns a dictionary mapping
+        filename to its specific diff content.
+        """
+        file_diffs = {}
+        staged_files = await self.get_staged_files(repo_path)
+        
+        for file in staged_files:
+            # Get the diff for each file individually
+            diff_content = await self._run_git_command(repo_path, ['diff', '--cached', '--', file])
+            if diff_content:
+                file_diffs[file] = diff_content
+        return file_diffs
 
     async def get_staged_files(self, repo_path: Path) -> List[str]:
         """Get a list of staged file paths."""
@@ -18,12 +33,11 @@ class GitUtils:
     async def get_unstaged_files(self, repo_path: Path) -> List[str]:
         """Get a list of files that are modified but not staged."""
         result = await self._run_git_command(repo_path, ['status', '--porcelain'])
-        return [line.strip().split(" ", 1)[1] for line in result.splitlines()]
+        return [line.strip().split(" ", 1)[1] for line in result.splitlines() if line.strip()]
 
     async def get_local_branches(self, repo_path: Path) -> List[str]:
         """Get a list of local branch names."""
         result = await self._run_git_command(repo_path, ['branch', '--list'])
-        # The output might contain '* ' for the current branch, so we clean it up
         return [b.replace('*', '').strip() for b in result.splitlines()]
 
     async def switch_branch(self, repo_path: Path, branch_name: str, create: bool = False) -> bool:
@@ -48,8 +62,7 @@ class GitUtils:
 
     async def is_git_repo(self, repo_path: Path) -> bool:
         """Check if the directory is a git repository."""
-        git_dir = repo_path / ".git"
-        return git_dir.exists() and git_dir.is_dir()
+        return (repo_path / ".git").is_dir()
     
     async def get_status(self, repo_path: Path) -> str:
         """Get the status of the git repository."""
@@ -58,7 +71,7 @@ class GitUtils:
     async def get_branches(self, repo_path: Path) -> str:
         """Get all local and remote branches."""
         return await self._run_git_command(repo_path, ['branch', '-a'])
-    
+
     async def _run_git_command(self, repo_path: Path, command: List[str]) -> str:
         """Runs a git command asynchronously using the safer exec method."""
         try:
@@ -69,15 +82,13 @@ class GitUtils:
                 stderr=asyncio.subprocess.PIPE
             )
             stdout, stderr = await process.communicate()
-            if process.returncode != 0:
-                if not (command[0] == 'commit' and b'nothing to commit' in stdout):
-                    raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
+            if process.returncode != 0 and not (command[0] == 'commit' and b'nothing to commit' in stdout):
+                raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
             return stdout.decode('utf-8').strip()
         except FileNotFoundError:
-            raise Exception("Git not found. Please install Git and ensure it's in your PATH.")
+            raise Exception("Git not found. Please install Git.")
         except subprocess.CalledProcessError as e:
-            error_message = e.stderr.decode('utf-8').strip()
-            raise Exception(f"Git command failed: {error_message}")
+            raise Exception(f"Git command failed: {e.stderr.decode('utf-8').strip()}")
         except Exception as e:
             raise Exception(f"An unexpected error occurred with git: {e}")
     
@@ -96,7 +107,7 @@ class GitUtils:
             return True
         except Exception:
             return False
-
+        
     async def add_files(self, repo_path: Path, file_paths: List[str]) -> bool:
         """Add multiple files to git staging."""
         try:
@@ -111,8 +122,7 @@ class GitUtils:
             await self._run_git_command(repo_path, ['commit', '-m', message])
             return "nothing to commit" not in await self.get_status(repo_path)
         except Exception as e:
-            if "nothing to commit" in str(e):
-                return False
+            if "nothing to commit" in str(e): return False
             raise e
     
     async def push(self, repo_path: Path, branch: str, set_upstream: bool = False) -> bool:
@@ -125,3 +135,9 @@ class GitUtils:
             return True
         except Exception as e:
             raise Exception(f"Failed to push to remote: {e}")
+        
+    async def get_formatted_log(self, repo_path: Path, count: int = 15) -> str:
+        """Gets a nicely formatted git log."""
+        # The format string shows: commit hash (short), relative time, author, and subject
+        format_str = "%C(yellow)%h%C(reset) %C(green)(%cr)%C(reset) %C(bold blue)<%an>%C(reset) %s"
+        return await self._run_git_command(repo_path, ['log', f'--pretty=format:{format_str}', f'-n{count}'])

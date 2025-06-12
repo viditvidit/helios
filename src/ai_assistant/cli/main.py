@@ -97,36 +97,6 @@ def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
             console.print(traceback.format_exc())
         sys.exit(1)
 
-
-@cli.command()
-@click.pass_context
-def index(ctx):
-    """
-    Scans the repository, chunks files, and creates vector embeddings for RAG.
-    This command must be run first in a new repository.
-    """
-    config = ctx.obj
-    console.print("[bold cyan]Starting repository indexing process...[/bold cyan]")
-    try:
-        repo_path = Path.cwd()
-        file_contents = build_repo_context(repo_path, config)
-        if not file_contents:
-            console.print("[yellow]No supported files found to index.[/yellow]")
-            return
-        console.print(f"Found {len(file_contents)} files to process.")
-
-        vector_store = VectorStore(config)
-        vector_store.index_files(file_contents)
-        
-        console.print("[bold green]✓ Repository indexing complete![/bold green]")
-        console.print("You can now start the chat session with `helios`.")
-
-    except Exception as e:
-        console.print(f"[bold red]An error occurred during indexing: {e}[/bold red]")
-        import traceback
-        console.print(f"[dim]{traceback.format_exc()}[/dim]")
-
-
 @cli.command()
 @click.argument('prompt', nargs=-1)
 @click.option('--file', '-f', multiple=True, help='Include file in context')
@@ -139,8 +109,6 @@ def code(ctx, prompt, file, diff, apply):
         console.print("[yellow]Please provide a prompt for the code command.[/yellow]")
         return
     asyncio.run(_code_command(ctx, prompt, file, diff, apply))
-
-# The repo-summary and review commands are now removed from here.
 
 async def _code_command(ctx, prompt, files, diff, apply):
     try:
