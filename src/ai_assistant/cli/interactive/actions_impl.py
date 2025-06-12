@@ -1,6 +1,8 @@
 import questionary
 
 from ...logic import file_logic, git_logic, github_logic
+from ...services.github_service import GitHubService
+from ...utils.git_utils import GitUtils
 from rich.console import Console
 
 console = Console()
@@ -32,11 +34,37 @@ async def handle_git_push(session):
     await git_logic.push()
 
 async def handle_review(session, show_diff: bool = False):
-    """Dispatcher for the review and commit workflow. Correctly passes show_diff."""
-    commit_success = await git_logic.review_and_commit(show_diff=show_diff)
-    if commit_success:
-        if await questionary.confirm("Create a Pull Request for this commit?", default=True, auto_enter=False).ask_async():
+    """Dispatcher for the review -> commit -> push -> PR workflow."""
+    commit_success, branch_name = await git_logic.review_and_commit(show_diff=show_diff)
+    if not commit_success:
+        return
+
+    # --- NEW PUSH -> PR FLOW ---
+    if await questionary.confirm("Push these changes to the remote?", default=True, auto_enter=False).ask_async():
+        git_utils = GitUtils()
+        with console.status(f"Pushing '{branch_name}'..."):
+            await git_utils.push(session.config.work_dir, branch_name, set_upstream=True)
+        console.print(f"[green]✓ Branch '{branch_name}' pushed successfully.[/green]")
+
+        # Now, intelligently ask about PR creation
+        service = GitHubService(session.config)
+        existing_pr_url = await service.check_for_open_pr(branch_name)
+
+        if existing_pr_url:
+            console.print(f"[yellow]An open Pull Request already exists for this branch:[/yellow] {existing_pr_url}")
+            return
+            
+        if await questionary.confirm("Create a Pull Request for this branch?", default=True, auto_enter=False).ask_async():
             await github_logic.interactive_pr_creation(session)
+
+async def handle_pr_approve(session, pr_number_str: str):
+    await github_logic.approve_pr(session, pr_number_str)
+
+async def handle_pr_comment(session, pr_number_str: str):
+    await github_logic.comment_on_pr(session, pr_number_str)
+
+async def handle_pr_merge(session, pr_number_str: str):
+    await github_logic.merge_pr(session, pr_number_str)
 
 async def handle_create_repo(session):
     await github_logic.create_repo(session)
@@ -58,3 +86,47 @@ async def handle_repo_summary(session):
 async def handle_pr_review(session, pr_number_str: str):
     """Dispatcher for the interactive PR review workflow."""
     await github_logic.interactive_pr_review(session, pr_number_str)
+
+# --- Git ---
+async def handle_git_log(session):
+    await git_logic.log()
+
+# --- GitHub ---
+async def handle_issue_list(session, args):
+    """Dispatcher for listing issues with filter handling."""
+    assignee = None
+    if args and args[0].lower() == '--filter' and len(args) > 1:
+        assignee = args[1]
+    # Legacy support for just `/issue_list <username>`
+    elif args and not args[0].startswith('--'):
+        assignee = args[0]
+        
+    await github_logic.list_issues(session, assignee)
+
+async def handle_pr_list(session):
+    await github_logic.list_prs(session)
+
+async def handle_issue_close(session, args):
+    issue_number = args[0] if args else ""
+    comment = ' '.join(args[1:]) if len(args) > 1 else ""
+    await github_logic.close_issue(session, issue_number, comment)
+
+async def handle_issue_comment(session, args):
+    issue_number = args[0] if args else ""
+    comment = ' '.join(args[1:])
+    await github_logic.comment_on_issue(session, issue_number, comment)
+
+async def handle_issue_assign(session, args):
+    issue_number = args[0] if len(args) > 0 else ""
+    assignee = args[1] if len(args) > 1 else ""
+    await github_logic.assign_issue(session, issue_number, assignee)
+
+async def handle_pr_link_issue(session, args):
+    pr_number = args[0] if len(args) > 0 else ""
+    issue_number = args[1] if len(args) > 1 else ""
+    await github_logic.link_pr_to_issue(session, pr_number, issue_number)
+
+async def handle_pr_request_review(session, args):
+    pr_number = args[0] if len(args) > 0 else ""
+    reviewers = args[1:]
+    await github_logic.request_pr_reviewers(session, pr_number, reviewers)

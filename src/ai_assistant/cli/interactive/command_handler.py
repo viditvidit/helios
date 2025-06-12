@@ -37,8 +37,22 @@ class CommandHandler:
                 await actions_impl.handle_review(self.session, show_diff=show_diff)
             elif cmd == 'create_branch': await actions_impl.handle_create_branch(self.session)
             elif cmd == 'create_pr': await actions_impl.handle_create_pr(self.session)
+            elif cmd == 'pr_approve':
+                await actions_impl.handle_pr_approve(self.session, args[0] if args else "")
+            elif cmd == 'pr_comment':
+                await actions_impl.handle_pr_comment(self.session, args[0] if args else "")
+            elif cmd == 'pr_merge':
+                await actions_impl.handle_pr_merge(self.session, args[0] if args else "")
             elif cmd == 'create_issue': await actions_impl.handle_create_issue(self.session)
             elif cmd == 'create_repo': await actions_impl.handle_create_repo(self.session)
+            elif cmd == 'git_log': await actions_impl.handle_git_log(self.session)
+            elif cmd == 'issue_list': await actions_impl.handle_issue_list(self.session, args)
+            elif cmd == 'pr_list': await actions_impl.handle_pr_list(self.session)
+            elif cmd == 'issue_close': await actions_impl.handle_issue_close(self.session, args)
+            elif cmd == 'issue_comment': await actions_impl.handle_issue_comment(self.session, args)
+            elif cmd == 'issue_assign': await actions_impl.handle_issue_assign(self.session, args)
+            elif cmd == 'pr_link_issue': await actions_impl.handle_pr_link_issue(self.session, args)
+            elif cmd == 'pr_request_review': await actions_impl.handle_pr_request_review(self.session, args)
             
             # New AI Review Commands
             elif cmd == 'repo_summary': await actions_impl.handle_repo_summary(self.session)

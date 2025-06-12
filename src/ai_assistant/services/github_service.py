@@ -215,3 +215,141 @@ class GitHubService:
             return issue.html_url
         except GithubException as e:
             raise GitHubServiceError(f"Failed to create issue: {e}")
+        
+    # --- NEW: Check for existing PRs ---
+    async def check_for_open_pr(self, branch_name: str) -> Optional[str]:
+        """Checks if an open PR already exists for a given branch."""
+        repo = await self._get_repo_object()
+        try:
+            pulls = repo.get_pulls(state='open', head=f'{repo.owner.login}:{branch_name}')
+            if pulls.totalCount > 0:
+                return pulls[0].html_url
+            return None
+        except GithubException:
+            return None # Fail gracefully if there's an issue
+
+    # --- UPDATED: Add Helios signature to PR body ---
+    async def create_pull_request(self, title: str, body: str, head_branch: str, base_branch: str) -> str:
+        """Creates a pull request with the Helios signature."""
+        repo = await self._get_repo_object()
+        
+        # Add the signature
+        signature = "\n\n[###### Assisted by Helios ######]"
+        full_body = f"{body}{signature}"
+
+        try:
+            pr = repo.create_pull(title=title, body=full_body, head=head_branch, base=base_branch)
+            console.print(f"[green]✓ Successfully created Pull Request #{pr.number}: {pr.html_url}[/green]")
+            return pr.html_url
+        except GithubException as e:
+            errors = e.data.get('errors', [{}]); message = errors[0].get('message', 'Could not create PR.')
+            raise GitHubServiceError(f"Failed to create Pull Request: {message}")
+
+    # --- NEW: PR Management Methods ---
+    async def approve_pr(self, pr_number: int):
+        """Approves a given pull request."""
+        repo = await self._get_repo_object()
+        try:
+            pr = repo.get_pull(pr_number)
+            pr.create_review(event='APPROVE')
+            console.print(f"[green]✓ Approved Pull Request #{pr_number}.[/green]")
+        except UnknownObjectException:
+            raise GitHubServiceError(f"Pull Request #{pr_number} not found.")
+        except GithubException as e:
+            raise GitHubServiceError(f"Failed to approve PR: {e.data.get('message', 'Unknown error')}")
+
+    async def comment_on_pr(self, pr_number: int, comment: str):
+        """Adds a comment to a given pull request."""
+        repo = await self._get_repo_object()
+        if not comment:
+            raise GitHubServiceError("Comment cannot be empty.")
+        try:
+            pr = repo.get_pull(pr_number)
+            pr.create_issue_comment(comment)
+            console.print(f"[green]✓ Comment posted on Pull Request #{pr_number}.[/green]")
+        except UnknownObjectException:
+            raise GitHubServiceError(f"Pull Request #{pr_number} not found.")
+        except GithubException as e:
+            raise GitHubServiceError(f"Failed to post comment: {e.data.get('message', 'Unknown error')}")
+
+    async def merge_pr(self, pr_number: int, merge_method: str = "merge"):
+        """Merges a given pull request."""
+        repo = await self._get_repo_object()
+        try:
+            pr = repo.get_pull(pr_number)
+            if not pr.mergeable:
+                raise GitHubServiceError("PR is not mergeable. Check for conflicts or failed checks.")
+            
+            pr.merge(merge_method=merge_method)
+            console.print(f"[green]✓ Merged Pull Request #{pr_number} using '{merge_method}' method.[/green]")
+        except UnknownObjectException:
+            raise GitHubServiceError(f"Pull Request #{pr_number} not found.")
+        except GithubException as e:
+            raise GitHubServiceError(f"Failed to merge PR: {e.data.get('message', 'Unknown error')}")
+        
+    # --- NEW ISSUE MANAGEMENT METHODS ---
+    async def get_issues(self, state: str = 'open', assignee_filter: Optional[str] = None):
+        """Fetches issues. Correctly handles all assignee filter cases."""
+        repo = await self._get_repo_object()
+        
+        # If no filter is provided, call get_issues without the assignee parameter.
+        if assignee_filter is None:
+            return repo.get_issues(state=state)
+        # Otherwise, pass the filter string ('*', 'none', or a username) to the library.
+        else:
+            return repo.get_issues(state=state, assignee=assignee_filter)
+
+    async def close_issue(self, issue_number: int, comment: Optional[str] = None):
+        repo = await self._get_repo_object()
+        try:
+            issue = repo.get_issue(issue_number)
+            if comment:
+                issue.create_comment(comment)
+            issue.edit(state='closed')
+            console.print(f"[green]✓ Closed Issue #{issue_number}.[/green]")
+        except UnknownObjectException:
+            raise GitHubServiceError(f"Issue #{issue_number} not found.")
+
+    async def comment_on_issue(self, issue_number: int, comment: str):
+        repo = await self._get_repo_object()
+        if not comment: raise GitHubServiceError("Comment cannot be empty.")
+        try:
+            issue = repo.get_issue(issue_number)
+            issue.create_comment(comment)
+            console.print(f"[green]✓ Comment posted on Issue #{issue_number}.[/green]")
+        except UnknownObjectException:
+            raise GitHubServiceError(f"Issue #{issue_number} not found.")
+
+    async def assign_issue(self, issue_number: int, assignee_login: str):
+        repo = await self._get_repo_object()
+        try:
+            issue = repo.get_issue(issue_number)
+            issue.edit(assignees=[assignee_login])
+            console.print(f"[green]✓ Assigned Issue #{issue_number} to {assignee_login}.[/green]")
+        except UnknownObjectException:
+            raise GitHubServiceError(f"Issue #{issue_number} not found.")
+
+    # --- NEW PR MANAGEMENT METHODS ---
+    async def get_open_prs(self):
+        repo = await self._get_repo_object()
+        return repo.get_pulls(state='open')
+
+    async def link_pr_to_issue(self, pr_number: int, issue_number: int):
+        repo = await self._get_repo_object()
+        try:
+            pr = repo.get_pull(pr_number)
+            new_body = f"{pr.body}\n\nCloses #{issue_number}"
+            pr.edit(body=new_body)
+            console.print(f"[green]✓ Linked PR #{pr_number} to Issue #{issue_number}.[/green]")
+        except UnknownObjectException:
+            raise GitHubServiceError(f"PR #{pr_number} or Issue #{issue_number} not found.")
+    
+    async def request_pr_reviewers(self, pr_number: int, reviewers: List[str]):
+        repo = await self._get_repo_object()
+        if not reviewers: raise GitHubServiceError("Reviewer list cannot be empty.")
+        try:
+            pr = repo.get_pull(pr_number)
+            pr.create_review_request(reviewers=reviewers)
+            console.print(f"[green]✓ Requested review from {', '.join(reviewers)} for PR #{pr_number}.[/green]")
+        except UnknownObjectException:
+            raise GitHubServiceError(f"PR #{pr_number} not found.")

@@ -135,3 +135,9 @@ class GitUtils:
             return True
         except Exception as e:
             raise Exception(f"Failed to push to remote: {e}")
+        
+    async def get_formatted_log(self, repo_path: Path, count: int = 15) -> str:
+        """Gets a nicely formatted git log."""
+        # The format string shows: commit hash (short), relative time, author, and subject
+        format_str = "%C(yellow)%h%C(reset) %C(green)(%cr)%C(reset) %C(bold blue)<%an>%C(reset) %s"
+        return await self._run_git_command(repo_path, ['log', f'--pretty=format:{format_str}', f'-n{count}'])

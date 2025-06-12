@@ -37,28 +37,41 @@ def show_help():
   /apply                   Apply all code changes from the last AI response
   /new <filename>          Create a new empty file
   /save <filename>         Save the last AI code response to a specific file
-  /save_conversation <file> Save conversation to a markdown file
 
-[bold cyan]Git & GitHub Commands:[/bold cyan]
+[bold cyan]Local Git Commands:[/bold cyan]
   /git_add <files...>      Stage one or more files for commit
   /git_commit <message>    Commit staged changes with a message
   /git_switch <branch>     Switch to a different local branch
+  /git_log                 Show recent commit history
   /git_pull                Pull latest changes for the current branch
   /git_push                Push committed changes to the remote repository
-  /review [-d]             Review changes, commit, and optionally create a PR.
-                           (Use -d for a detailed, full diff view).
+  
+[bold cyan]GitHub Workflow Commands:[/bold cyan]
+  /review [-d]             Review changes, commit, push, and create a PR.
   /create_branch           Interactively create a new local branch
   /create_pr               Interactively create a new Pull Request
   /create_issue            Interactively create a new GitHub Issue
   /create_repo             Interactively create a new GitHub repository
 
-[bold cyan]AI-Powered Review Commands:[/bold cyan]
-  /repo_summary            Get an AI-generated summary of the entire repository
-  /pr_review <number>      Get an AI-generated review of a specific Pull Request
+[bold cyan]Issue & PR Management:[/bold cyan]
+  /issue_list [--filter <user|none|*>]  List open issues.
+                           <user>: issues for a specific user.
+                           'none': unassigned issues.
+                           '*': issues with any assignee.
+                           (default): all issues.
+  /issue_comment <#> <text> Add a comment to an issue.
+  /issue_assign <#> <user> Assign an issue to a user.
+  /issue_close <#> [text]  Close an issue, optionally with a comment.
+  /pr_list                 List open Pull Requests.
+  /pr_link_issue <pr#> <iss#> Link a PR to an issue.
+  /pr_request_review <pr#> <user..> Request reviews for a PR.
+  /pr_approve <#>          Approve a Pull Request.
+  /pr_comment <#>          Add a comment to a PullRequest.
+  /pr_merge <#>            Merge a Pull Request.
 
-[bold cyan]Controls:[/bold cyan]
-  Ctrl+C                   Stop current AI response generation
-  exit, quit, bye          Exit the session
+[bold cyan]AI-Powered Review Commands:[/bold cyan]
+  /repo_summary            Get an AI-generated summary of the entire repository.
+  /pr_review <#>           Get an AI-generated review of a specific Pull Request.
 """
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 

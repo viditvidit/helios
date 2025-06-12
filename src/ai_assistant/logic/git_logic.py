@@ -67,8 +67,21 @@ async def push():
         except Exception as e:
             console.print(f"[red]Push failed: {e}[/red]")
 
-async def review_and_commit(show_diff: bool) -> bool:
-    """Handles logic for reviewing changes with two different view modes."""
+async def log():
+    """Logic to display the formatted git log."""
+    git_utils = GitUtils()
+    repo_path = Path.cwd()
+    if not await git_utils.is_git_repo(repo_path):
+        return console.print("[red]This is not a git repository.[/red]")
+    
+    log_output = await git_utils.get_formatted_log(repo_path)
+    console.print(Panel(log_output, title="Recent Commits", border_style="blue"))
+
+async def review_and_commit(show_diff: bool = False) -> tuple[bool, str]:
+    """
+    Handles reviewing and committing.
+    Returns a tuple: (commit_successful, committed_branch_name)
+    """
     git_utils = GitUtils()
     repo_path = Path.cwd()
     try:
@@ -86,42 +99,32 @@ async def review_and_commit(show_diff: bool) -> bool:
         per_file_diffs = await git_utils.get_staged_diff_by_file(repo_path)
         if not per_file_diffs:
             console.print("[yellow]No staged changes to review.[/yellow]")
-            return False
+            return False, ""
 
         console.print(Panel(f"[bold]Found changes in {len(per_file_diffs)} file(s).[/bold]", border_style="cyan"))
-
         if show_diff:
-            # DETAILED VIEW: Panel per file
             for filename, diff_content in per_file_diffs.items():
-                console.print(Panel(Syntax(diff_content, "diff", theme="github-dark", word_wrap=True), title=f"{filename}", border_style="green"))
+                console.print(Panel(Syntax(diff_content, "diff", theme="github-dark", word_wrap=True), title=f"{filename}"))
         else:
-            # COMPACT VIEW: <filename>: +<add> -<del>
-            summary_lines = []
-            for filename, diff_content in per_file_diffs.items():
-                added = diff_content.count('\n+')
-                removed = diff_content.count('\n-')
-                summary_line = Text(f"{filename}: ")
-                summary_line.append(f"+{added}", style="green")
-                summary_line.append(" ")
-                summary_line.append(f"-{removed}", style="red")
-                summary_lines.append(summary_line)
+            summary_lines = [Text(f"{f}: ").append(f"+{d.count('\n+')} ", style="green").append(f"-{d.count('\n-')}", style="red") for f, d in per_file_diffs.items()]
             console.print(Text("\n").join(summary_lines))
 
         if not await questionary.confirm("\nProceed to commit these changes?", default=True, auto_enter=False).ask_async():
             console.print("[yellow]Commit aborted.[/yellow]")
-            return False
+            return False, ""
 
         commit_message = await questionary.text("Enter commit message:").ask_async()
         if not commit_message:
             console.print("[red]Commit message cannot be empty. Aborting.[/red]")
-            return False
+            return False, ""
 
         await git_utils.commit(repo_path, commit_message)
-        console.print(f"[green]✓ Changes committed.[/green]")
-        return True
+        current_branch = await git_utils.get_current_branch(repo_path)
+        console.print(f"[green]✓ Changes committed to branch '{current_branch}'.[/green]")
+        return True, current_branch
     except NotAGitRepositoryError as e:
         console.print(f"[red]{e.message}[/red]")
-        return False
+        return False, ""
     except Exception as e:
         console.print(f"[red]An error occurred during review: {e}[/red]")
-        return False
+        return False, ""
