@@ -98,7 +98,7 @@ async def handle_repo_summary(session):
 
 async def handle_pr_review(session, pr_number_str: str):
     """Dispatcher for the interactive PR review workflow."""
-    await github_logic.interactive_pr_review(session, pr_number_str)
+    await github_logic.pr_review(session, pr_number_str)
 
 # --- Git ---
 async def handle_git_log(session):
