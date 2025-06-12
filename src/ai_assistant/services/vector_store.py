@@ -104,9 +104,9 @@ class VectorStore:
             console.print("[yellow]No text chunks were generated from files.[/yellow]")
             return
             
-        with console.status("[bold yellow]Creating embeddings... (This can take a while)[/bold yellow]", spinner="earth"):
+        with console.status("[bold yellow]Creating embeddings... (This can take a while)[/bold yellow]", spinner="moon"):
             # This line will now trigger the lazy load of the embedding_model property
-            embeddings = self.embedding_model.encode(all_chunks_text, show_progress_bar=False)
+            embeddings = self.embedding_model.encode(all_chunks_text, show_progress_bar=True)
         
         dimension = embeddings.shape[1]
         self._index = faiss.IndexFlatL2(dimension)

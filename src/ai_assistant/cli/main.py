@@ -16,7 +16,6 @@ from ..core.config import Config
 from ..core.exceptions import AIAssistantError, NotAGitRepositoryError, ConfigurationError
 from ..core.logger import setup_logging
 from .commands import CodeCommands
-from .github_commands import github as github_group
 from .interactive.session import InteractiveSession
 from .interactive import display
 from ..utils.git_utils import GitUtils
@@ -141,29 +140,7 @@ def code(ctx, prompt, file, diff, apply):
         return
     asyncio.run(_code_command(ctx, prompt, file, diff, apply))
 
-@cli.command(name="repo-summary", help="Get an AI-generated summary of a Git repository's status.")
-@click.option('--path', 'repo_path_str', default=None, type=click.Path(exists=True, file_okay=False, dir_okay=True, readable=True), help="Path to the Git repository (defaults to current directory).")
-@click.pass_context
-def repo_summary_command(ctx, repo_path_str: Optional[str]):
-    """Provides an AI-generated summary of the specified Git repository."""
-    repo_path = Path(repo_path_str) if repo_path_str else Path.cwd()
-    asyncio.run(_repo_summary_command(ctx, repo_path))
-
-async def _repo_summary_command(ctx, repo_path: Path):
-    try:
-        cmd = CodeCommands(ctx.obj)
-        summary = await cmd.get_ai_repo_summary(repo_path)
-        console.print(Panel(summary, title="Repository Summary", border_style="blue"))
-    except NotAGitRepositoryError as e:
-        console.print(f"[yellow]{e.message}[/yellow]")
-    except AIAssistantError as e:
-        console.print(f"[red]Error: {e}[/red]")
-
-@cli.command()
-@click.pass_context
-def review(ctx):
-    """Review and commit code changes (non-interactive)."""
-    asyncio.run(_review_command(ctx))
+# The repo-summary and review commands are now removed from here.
 
 async def _code_command(ctx, prompt, files, diff, apply):
     try:
@@ -177,17 +154,6 @@ async def _code_command(ctx, prompt, files, diff, apply):
     except AIAssistantError as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
-
-async def _review_command(ctx):
-    try:
-        cmd = CodeCommands(ctx.obj)
-        await cmd.review_changes()
-    except AIAssistantError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        sys.exit(1)
-
-# Add the GitHub command group
-cli.add_command(github_group)
 
 def main():
     cli()

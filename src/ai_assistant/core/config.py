@@ -27,7 +27,7 @@ class ModelConfig:
     system_prompt: str
     api_key: Optional[str] = None
     max_tokens: int = 80000
-    timeout: int = 600
+    timeout: int = 1200
 
 @dataclass
 class GitHubConfig:
