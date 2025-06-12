@@ -52,12 +52,9 @@ def show_help():
   
 [bold cyan]GitHub Workflow Commands:[/bold cyan]
   /review [-d]             Review changes, commit, push, and create a PR.
-  /create_branch           Interactively create a new local branch
-  /create_pr               Interactively create a new Pull Request
-  /create_issue            Interactively create a new GitHub Issue
   /create_repo             Interactively create a new GitHub repository
-
-[bold cyan]Issue & PR Management:[/bold cyan]
+  /create_branch           Interactively create a new local branch
+  /create_issue            Interactively create a new GitHub Issue
   /issue_list [--filter <user|none|all>]  List open issues.
                            (Default: shows all assigned issues).
                            <user>: issues for a specific user.
@@ -66,6 +63,7 @@ def show_help():
   /issue_comment <#> <text> Add a comment to an issue.
   /issue_assign <#> <user> Assign an issue to a user.
   /issue_close <#> [text]  Close an issue, optionally with a comment.
+  /create_pr               Interactively create a new Pull Request
   /pr_list                 List open Pull Requests.
   /pr_link_issue <pr#> <iss#> Link a PR to an issue.
   /pr_request_review <pr#> <user..> Request reviews for a PR.
