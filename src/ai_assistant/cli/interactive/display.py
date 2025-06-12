@@ -1,5 +1,8 @@
 from rich.console import Console
 from rich.panel import Panel
+from rich.text import Text
+from rich.table import Table
+from rich.columns import Columns
 from pyfiglet import Figlet
 from typing import Dict
 import os
@@ -32,6 +35,7 @@ def show_help():
   /files                   List files in current context
   /clear                   Clear conversation history
   /refresh                 Refresh repository context
+  /index                   Manually re-index the entire repository.
   /repo                    Show local repository statistics and status
   /model                   Show/switch AI model
   /apply                   Apply all code changes from the last AI response
@@ -86,7 +90,7 @@ def list_files_in_context(current_files: Dict[str, str]):
     panel_content += "\n".join(files_info)
     console.print(Panel(panel_content, title="Files in Context", border_style="blue"))
 
-
+'''
 def show_repo_stats(repo_context: Dict[str, str], git_context: Dict):
     from pathlib import Path
     file_count = len(repo_context)
@@ -105,6 +109,59 @@ def show_repo_stats(repo_context: Dict[str, str], git_context: Dict):
 [dim]{git_context.get('status', 'N/A') or 'No changes detected'}[/dim]
 """
     console.print(Panel(stats_text, title="Repository Overview", border_style="blue"))
+'''
+    
+def show_repo_dashboard(details: Dict):
+    """Displays the new, comprehensive repository dashboard."""
+    
+    # --- Header ---
+    header = Text(details.get('name', 'N/A'), style="bold blue", justify="center")
+    description = Text(details.get('description', 'No description provided.'), style="italic", justify="center")
+    console.print(Panel(Text.assemble(header, "\n", description)))
+
+    # --- Core Stats Table ---
+    stats_table = Table.grid(padding=(0, 2))
+    stats_table.add_column(style="bold cyan")
+    stats_table.add_column()
+    stats_table.add_row("Current Branch:", f"[green]{details.get('current_branch', 'N/A')}[/green]")
+    stats_table.add_row("Total Issues:", str(details.get('issues_count', 'N/A')))
+    stats_table.add_row("Open PRs:", str(details.get('prs_count', 'N/A')))
+
+    # --- Branches List ---
+    branches = details.get('branches', [])
+    branch_text = ", ".join(branches[:5])
+    if len(branches) > 5:
+        branch_text += f", and {len(branches) - 5} more..."
+    branches_panel = Panel(branch_text, title=f"Branches ({len(branches)})", border_style="green")
+    
+    # --- Languages Panel ---
+    languages = details.get('languages', {})
+    total_loc = sum(languages.values())
+    if total_loc > 0:
+        lang_bars = []
+        for lang, loc in languages.items():
+            percentage = (loc / total_loc) * 100
+            lang_bars.append(f"{lang}: {percentage:.1f}%")
+        languages_panel = Panel("\n".join(lang_bars), title="Languages", border_style="magenta")
+    else:
+        languages_panel = Panel("No language data.", title="Languages", border_style="magenta")
+
+    # --- Layout with Columns ---
+    top_row = Columns([stats_table, branches_panel, languages_panel], equal=True)
+    console.print(top_row)
+    
+    # --- Git Status and Commits ---
+    git_status = details.get('status')
+    status_panel = Panel(git_status or "[green]No changes detected.[/green]", title="Git Status", border_style="yellow")
+    
+    commits_panel = Panel(details.get('recent_commits', 'Could not fetch commits.'), title="Recent Commits", border_style="blue")
+
+    console.print(Columns([status_panel, commits_panel], equal=True))
+
+    # --- Contributors ---
+    contributors = details.get('contributors', [])
+    contributors_text = Text(", ".join(contributors), style="dim")
+    console.print(Panel(contributors_text, title=f"Contributors ({len(contributors)})", border_style="dim"))
 
 def show_code_suggestions():
     suggestion_message = (

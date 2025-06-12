@@ -1,6 +1,6 @@
 import questionary
 
-from ...logic import file_logic, git_logic, github_logic
+from ...logic import file_logic, git_logic, github_logic, indexing_logic
 from ...services.github_service import GitHubService
 from ...utils.git_utils import GitUtils
 from rich.console import Console
@@ -10,12 +10,25 @@ console = Console()
 # --- File Operations ---
 async def handle_new_file(session, file_path: str):
     await file_logic.new_file(file_path, session.current_files)
+    # Ask to re-index
+    if await questionary.confirm("Re-index repository to include this new file?", default=True, auto_enter=False).ask_async():
+        await handle_index(session)
 
 async def handle_save_last_code(session, filename: str):
-    await file_logic.save_code(session, filename)
+    success = await file_logic.save_code(session, filename)
+    # Ask to re-index
+    if success and await questionary.confirm("Re-index repository to include these changes?", default=True, auto_enter=False).ask_async():
+        await handle_index(session)
 
 async def handle_apply_changes(session):
     await file_logic.apply_changes(session)
+
+async def handle_index(session):
+    """Dispatcher for the manual indexing command."""
+    file_contents = await indexing_logic.run_indexing(session.config)
+    if file_contents:
+        session.current_files.clear()
+        session.current_files.update(file_contents)
 
 # --- Git & GitHub Operations ---
 async def handle_git_add(session, files: list[str]):

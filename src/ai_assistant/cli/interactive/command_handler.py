@@ -15,6 +15,8 @@ class CommandHandler:
         try:
             # General Commands
             if cmd == 'help': display.show_help()
+            elif cmd == 'index':
+                await actions_impl.handle_index(self.session)
             elif cmd == 'file': await actions.add_file_to_context(self.session, args[0] if args else "")
             elif cmd == 'refresh': await actions.refresh_repo_context(self.session)
             elif cmd == 'clear': actions.clear_history(self.session)
