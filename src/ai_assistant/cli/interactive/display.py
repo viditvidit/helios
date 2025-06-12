@@ -72,6 +72,9 @@ def show_help():
   /pr_comment <#>          Add a comment to a Pull Request.
   /pr_merge <#>            Merge a Pull Request.
 
+  [bold cyan]Agentic Mode:[/bold cyan]
+  /knight <goal>           Activate the autonomous agent to achieve a high-level goal.
+
  [bold cyan]Code Quality Commands:[/bold cyan]
   /optimize <filename>     Ask the AI to optimize/refactor a specific file.
   /scan                    Perform a high-level scan of the repository for potential improvements. 

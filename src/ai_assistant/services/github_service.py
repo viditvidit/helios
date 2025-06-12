@@ -19,15 +19,27 @@ class GitHubService:
     def __init__(self, config: Config):
         self.config = config
         self.git_utils = GitUtils()
-        token = os.getenv("GITHUB_TOKEN")
-        if not token:
-            raise GitHubServiceError("GITHUB_TOKEN is not set in your environment. Please set it in your .env file.")
+        token = self.config.github.token or os.getenv("GITHUB_TOKEN")
         
-        self.gh = Github(token)
+        if not token:
+            # Don't raise an error immediately. The agent will handle prompting the user.
+            self.gh = None
+            self.user = None
+            return
+
         try:
+            self.gh = Github(token)
             self.user = self.gh.get_user()
+            # Store the successfully used token and username in the config
+            self.config.github.token = token
+            self.config.github.username = self.user.login
         except Exception as e:
             raise GitHubServiceError(f"Failed to authenticate with GitHub. Please check your GITHUB_TOKEN. Error: {e}")
+
+    async def _get_repo_object(self):
+        """Helper to get the PyGithub Repository object for the current directory."""
+        if not self.gh:
+            raise GitHubServiceError("GitHub token not configured. Agent could not prompt for credentials.")
 
     async def get_repository_context(self, repo_path: Path = None) -> dict:
         """

@@ -11,6 +11,32 @@ from ..core.exceptions import GitHubServiceError, NotAGitRepositoryError
 
 console = Console()
 
+async def ensure_github_credentials(session):
+    """Checks for GitHub credentials and prompts the user if they are missing."""
+    token = session.config.github.token or os.getenv("GITHUB_TOKEN")
+    if token:
+        return True # Credentials already exist
+
+    console.print("[bold yellow]GitHub credentials not found.[/bold yellow]")
+    token = await questionary.password("Please enter your GitHub Personal Access Token (it will be hidden):").ask_async()
+    
+    if not token:
+        console.print("[red]GitHub token is required to proceed with GitHub operations. Aborting.[/red]")
+        return False
+        
+    # Store for the current session
+    session.config.github.token = token
+    
+    # Re-initialize the service with the new token
+    try:
+        session.github_service = GitHubService(session.config)
+        console.print(f"[green]✓ Authenticated with GitHub as {session.github_service.user.login}.[/green]")
+        return True
+    except Exception as e:
+        console.print(f"[red]Authentication failed: {e}[/red]")
+        session.config.github.token = None # Clear invalid token
+        return False
+
 async def create_repo(session):
     """Logic to interactively create a new GitHub repository."""
     try:
