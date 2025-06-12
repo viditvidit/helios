@@ -165,10 +165,17 @@ async def merge_pr(session, pr_number_str: str):
         console.print(f"[red]Error: {e}[/red]")
 
 async def list_issues(session, assignee_filter: Optional[str]):
-    """Logic to list open issues with robust filtering."""
+    """Logic to list open issues with a smart default filter."""
     try:
         service = GitHubService(session.config)
         
+        # --- NEW DEFAULT LOGIC ---
+        # If no filter is provided, default to '*' (any assigned issue).
+        # This is more useful than showing everything including unassigned issues.
+        if assignee_filter is None:
+            assignee_filter = '*'
+
+        # Build user-friendly text for the status message
         filter_text = ""
         if assignee_filter:
             if assignee_filter.lower() == 'none':
@@ -179,7 +186,6 @@ async def list_issues(session, assignee_filter: Optional[str]):
                 filter_text = f" (Assigned to '{assignee_filter}')"
 
         with console.status(f"Fetching open issues{filter_text}..."):
-            # The service now correctly handles None, 'none', '*', or a username
             issues = await service.get_issues(assignee_filter=assignee_filter)
         
         if not issues.totalCount:
@@ -197,6 +203,7 @@ async def list_issues(session, assignee_filter: Optional[str]):
         
         console.print(table)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
+        console.print(f"[red]Error: {e}[/red]")
         console.print(f"[red]Error: {e}[/red]")
 
 async def list_prs(session):

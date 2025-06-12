@@ -54,11 +54,11 @@ def show_help():
   /create_repo             Interactively create a new GitHub repository
 
 [bold cyan]Issue & PR Management:[/bold cyan]
-  /issue_list [--filter <user|none|*>]  List open issues.
+  /issue_list [--filter <user|none|all>]  List open issues.
+                           (Default: shows all assigned issues).
                            <user>: issues for a specific user.
                            'none': unassigned issues.
-                           '*': issues with any assignee.
-                           (default): all issues.
+                           'all': all issues, assigned or not.
   /issue_comment <#> <text> Add a comment to an issue.
   /issue_assign <#> <user> Assign an issue to a user.
   /issue_close <#> [text]  Close an issue, optionally with a comment.
@@ -66,7 +66,7 @@ def show_help():
   /pr_link_issue <pr#> <iss#> Link a PR to an issue.
   /pr_request_review <pr#> <user..> Request reviews for a PR.
   /pr_approve <#>          Approve a Pull Request.
-  /pr_comment <#>          Add a comment to a PullRequest.
+  /pr_comment <#>          Add a comment to a Pull Request.
   /pr_merge <#>            Merge a Pull Request.
 
 [bold cyan]AI-Powered Review Commands:[/bold cyan]

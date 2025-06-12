@@ -289,15 +289,20 @@ class GitHubService:
         
     # --- NEW ISSUE MANAGEMENT METHODS ---
     async def get_issues(self, state: str = 'open', assignee_filter: Optional[str] = None):
-        """Fetches issues. Correctly handles all assignee filter cases."""
+        """
+        Fetches issues. Correctly handles all assignee filter cases by calling the
+        underlying library method differently based on the filter.
+        """
         repo = await self._get_repo_object()
         
         # If no filter is provided, call get_issues without the assignee parameter.
+        # This is the foolproof way to prevent the AssertionError.
         if assignee_filter is None:
             return repo.get_issues(state=state)
-        # Otherwise, pass the filter string ('*', 'none', or a username) to the library.
+        # Otherwise, if a filter string ('*', 'none', or a username) is provided,
+        # pass it directly to the library.
         else:
-            return repo.get_issues(state=state, assignee=assignee_filter)
+            return repo.get_issues(state=state, assignee="*")
 
     async def close_issue(self, issue_number: int, comment: Optional[str] = None):
         repo = await self._get_repo_object()

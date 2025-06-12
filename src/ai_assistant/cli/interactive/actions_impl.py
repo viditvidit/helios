@@ -94,12 +94,23 @@ async def handle_git_log(session):
 # --- GitHub ---
 async def handle_issue_list(session, args):
     """Dispatcher for listing issues with filter handling."""
-    assignee = None
+    assignee = None # Default is None, which logic layer will treat as '*'
+    
     if args and args[0].lower() == '--filter' and len(args) > 1:
-        assignee = args[1]
-    # Legacy support for just `/issue_list <username>`
+        filter_value = args[1].lower()
+        if filter_value == 'all':
+            # 'all' means no filter, so we pass None to the logic layer
+            assignee = None
+        else:
+            # Pass 'none', '*', or a username directly
+            assignee = filter_value
+    # Retain legacy support for /issue_list <username>
     elif args and not args[0].startswith('--'):
         assignee = args[0]
+    
+    # NEW: If no args, default to '*'
+    if not args:
+        assignee = '*'
         
     await github_logic.list_issues(session, assignee)
 
