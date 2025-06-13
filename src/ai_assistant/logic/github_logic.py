@@ -4,6 +4,7 @@ from rich.panel import Panel
 from rich.table import Table
 import questionary
 from typing import List, Optional
+import os
 
 from ..services.github_service import GitHubService
 from ..utils.git_utils import GitUtils
@@ -229,7 +230,6 @@ async def list_issues(session, assignee_filter: Optional[str]):
         
         console.print(table)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
-        console.print(f"[red]Error: {e}[/red]")
         console.print(f"[red]Error: {e}[/red]")
 
 async def list_prs(session):

@@ -20,7 +20,7 @@ console = Console()
 
 class Theme:
     HEADER = "#81A1C1"; GOAL = "#D8DEE9"; PLAN_TITLE = "#B48EAD"
-    STEP_HEADER = "#5E81AC"; REASONING = "#88C0D0"; SUCCESS = "#A3BE8C"; PROMPT = "#EBCB8B"
+    STEP_HEADER = "#5E81AC"; REASONING = "#ABEDFF"; SUCCESS = "#388238"; PROMPT = "#54A7FF"
 
 class KnightAgentHybrid:
     def __init__(self, session):
@@ -37,7 +37,7 @@ class KnightAgentHybrid:
             prompt_lines.append(f"- `{name}({param_str})`: {tool['description']}")
         return "\n".join(prompt_lines)
 
-    async def run(self, goal: str):        
+    async def run(self, goal: str):
         plan = await self._get_initial_plan(goal)
         if not plan: console.print("[red]Could not formulate a plan. Aborting.[/red]"); return
         
@@ -88,22 +88,19 @@ class KnightAgentHybrid:
     # --- MODIFIED: Stage 2 - Plan Generation ---
     async def _get_initial_plan(self, goal: str) -> list:
         prompt = (
-            "You are a plan-generating AI. Your sole task is to create a JSON array of objects to fulfill a user's goal. "
+            "You are a master software architect AI. Your sole task is to create a JSON array of objects to fulfill a user's goal. "
             "Your response MUST be a valid JSON array and nothing else. Follow the guidelines strictly.\n\n"
             "**Available Tools:**\n"
             f"{self._format_tools_for_prompt(self.tools)}\n\n"
-            "**CRITICAL GUIDELINES:**\n"
-            "1. **Schema:** Each step must have `command`, `arguments`, and `reasoning` keys.\n"
-            "2. **Scaffolding First:** If the user wants a standard project (e.g., React), your **FIRST** step for that part of the project should be to use `run_shell_command` with the official CLI (e.g., `npx create-react-app`). **DO NOT** create files like `package.json` manually before running the scaffolder.\n"
-            "3. **Git and GitHub Finalization:** To finish the project, you **MUST** use the single, high-level `setup_git_and_push` tool. This tool handles everything from committing to pushing. Do not call the individual `git_add`, `git_commit`, or `github_create_repo` tools yourself for the initial setup.\n"
-            "4. **Correct Workflow:**\n"
-            "   a. Create the root project directory.\n"
-            "   b. Run all scaffolding commands (`npx`, etc.).\n"
-            "   c. Run all installations (`npm install`, `pip install`).\n"
-            "   d. Generate any custom code with `generate_code_concurrently`.\n"
-            "   e. Run `git_init`.\n"
-            "   f. As the very last step before `task_complete`, run the single `setup_git_and_push` tool.\n"
-            "5. **Final Step:** The plan must end with a `task_complete` command.\n\n"
+            "**CRITICAL GUIDELINES FOR SUCCESS:**\n"
+            "1. **Schema:** Each step must have `command`, `arguments` (even if empty {}), and `reasoning` keys.\n"
+            "2. **Tool Selection:** You can only use the tools listed above.\n"
+            "3. **Dependency Conflicts (IMPORTANT):** When using `npm install` to add new libraries to a project created by a tool like `create-react-app`, peer dependency conflicts are very common. To prevent the plan from failing, you **MUST** add the argument `\"allow_dependency_conflicts\": true` to that specific `run_shell_command` step. This is a common and necessary practice in modern web development.\n"
+            "4. **Code Generation:** Use `generate_code_concurrently` to write multiple files at once for maximum efficiency. It is preferred over `generate_code_for_file`.\n"
+            "5. **Finalization:** The **ONLY** way to commit and push code to a new GitHub repo is with the `setup_git_and_push` tool. This is the final step of your plan before `task_complete`. \n"
+            "   - **DO NOT** use `git_add`, `git_commit`, `github_create_repo`, or `git_initial_push` individually. The `setup_git_and_push` command handles all of these steps idempotently.\n"
+            "6. **Verification Step:** For web applications, after all code is generated, add `run_shell_command` steps to start the frontend and backend servers using `background=True`. This demonstrates a working final product.\n"
+            "7. **Final Command:** The plan MUST end with a `task_complete` command, which takes a `message` argument for the user.\n\n"
             "---"
             f"Generate the JSON plan for the following goal:\n**Goal:** {goal}"
         )
@@ -128,7 +125,7 @@ class KnightAgentHybrid:
             console.print("[red]Error: AI did not return a valid JSON plan.[/red]"); console.print(f"[dim]Received: {plan_str}[/dim]"); return None
 
     async def _execute_plan(self, plan: list):
-        github_commands_in_plan = [step for step in plan if 'github' in step.get('command', '')]
+        github_commands_in_plan = [step for step in plan if 'github' in step.get('command', '') or 'git' in step.get('command', '')]
         if github_commands_in_plan:
             if not await github_logic.ensure_github_credentials(self.session):
                 console.print("[red]Could not verify GitHub credentials. Aborting plan.[/red]"); return

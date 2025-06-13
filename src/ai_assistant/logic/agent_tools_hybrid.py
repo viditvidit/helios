@@ -1,6 +1,7 @@
-# src/ai_assistant/logic/agent_tools.py
+# src/ai_assistant/logic/agent_tools_hybrid.py
 
 import asyncio
+import os
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TaskProgressColumn
 from rich.text import Text
@@ -220,21 +221,39 @@ async def github_create_repo_non_interactive(session, repo_name: str, descriptio
         console.print(f"[red]Error ensuring GitHub repo exists: {e}[/red]")
         return False
 
-async def run_shell_command(session, command: str, cwd: str = None, can_fail: bool = False, verbose: bool = False, force_overwrite: bool = False, background: bool = False) -> bool:
+async def run_shell_command(session, command: str, cwd: str = None, can_fail: bool = False, verbose: bool = False, force_overwrite: bool = False, background: bool = False, allow_dependency_conflicts: bool = False) -> bool:
     """
     Runs a shell command. If verbose=False, it will hide stdout/stderr unless the command fails.
     Automatically handles common "safe failures" like mkdir on existing directories.
     Set background=True for long-running processes like servers.
+    Set allow_dependency_conflicts=True for npm/yarn to use legacy peer dependency resolution.
     """
     work_dir = session.config.work_dir
     run_dir = work_dir / cwd if cwd else work_dir
 
-    # Check for virtual environment activation and verify the activation script exists.
+    if cwd and not run_dir.exists():
+        console.print(f"[yellow]Note: Working directory '{run_dir.relative_to(work_dir)}' does not exist. Creating it now.[/yellow]")
+        try:
+            run_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            console.print(f"[red]✗ Failed to create working directory '{run_dir}': {e}[/red]")
+            return False
+
+    effective_command = command
+    # --- FIX: Intelligently handle dependency conflicts for different package managers ---
+    if allow_dependency_conflicts:
+        cmd_lower = command.strip().lower()
+        if cmd_lower.startswith("npm install") or cmd_lower.startswith("npm i "):
+            console.print("[yellow]Peer dependency conflicts allowed. Appending '--legacy-peer-deps' for npm.[/yellow]")
+            effective_command += " --legacy-peer-deps"
+        # Add similar logic for other package managers if needed in the future
+        # elif cmd_lower.startswith("yarn add"):
+        #     effective_command += " --ignore-engines" # Example for yarn
+
     if command.strip().startswith("source"):
-        # Assume command is like "source some-env/bin/activate && rest-of-command"
         parts = command.split("&&")
         if parts:
-            activation_command = parts[0].strip()  # e.g., "source backend-env/bin/activate"
+            activation_command = parts[0].strip()
             tokens = activation_command.split()
             if len(tokens) >= 2:
                 activation_script = run_dir / tokens[1]
@@ -242,15 +261,13 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
                     console.print(f"[red]✗ Virtual environment activation script not found at {activation_script}. Please create the virtual environment first.[/red]")
                     return False
 
-    console.print(f"Running command: [bold magenta]{command}[/bold magenta] in [dim]{run_dir}[/dim]")
+    console.print(f"Running command: [bold magenta]{effective_command}[/bold magenta] in [dim]{run_dir}[/dim]")
 
-    # Auto-detect server commands that should run in background
     server_keywords = ['uvicorn', 'npm start', 'yarn start', 'flask run', 'python -m http.server', 'serve', '--watch', '--reload']
     if not background and any(keyword in command.lower() for keyword in server_keywords):
         console.print(f"[yellow]Detected server command. Running in background mode.[/yellow]")
         background = True
 
-    # Handle force overwrite for create-react-app and similar tools
     if force_overwrite and "create-react-app" in command:
         parts = command.split()
         if len(parts) >= 3:
@@ -264,7 +281,7 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
     try:
         if background:
             process = await asyncio.create_subprocess_shell(
-                command,
+                effective_command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=run_dir
@@ -290,7 +307,7 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
                 return True
         else:
             process = await asyncio.create_subprocess_shell(
-                command,
+                effective_command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=run_dir
@@ -360,37 +377,32 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
     except Exception as e:
         console.print(f"[yellow]Warning: Could not stage files: {e}. Continuing...[/yellow]")
 
-    # 2. Check if there's anything to commit
+    # 2. Commit the files (if there are changes)
     try:
         status = await git_utils.get_status(work_dir)
         if "nothing to commit" in status or not status.strip():
             console.print("[yellow]✓ No changes to commit. Repository is up to date.[/yellow]")
         else:
-            # 3. Commit the files
             console.print(f"[dim]Committing with message: '{commit_message}'...[/dim]")
-            try:
-                commit_made = await git_utils.commit(work_dir, commit_message)
-                if commit_made:
-                    console.print("[green]✓ Files committed.[/green]")
-                else:
-                    console.print("[yellow]✓ Nothing new to commit.[/yellow]")
-            except Exception as e:
-                if "nothing to commit" in str(e).lower():
-                    console.print("[yellow]✓ Nothing to commit - repository is clean.[/yellow]")
-                else:
-                    console.print(f"[yellow]Warning: Commit failed: {e}. Continuing with push...[/yellow]")
+            commit_made = await git_utils.commit(work_dir, commit_message)
+            if commit_made:
+                console.print("[green]✓ Files committed.[/green]")
+            else:
+                 console.print("[yellow]✓ Nothing new to commit.[/yellow]")
     except Exception as e:
         console.print(f"[yellow]Warning: Could not check git status: {e}. Attempting commit anyway...[/yellow]")
         try:
             await git_utils.commit(work_dir, commit_message)
-            console.print("[green]✓ Files committed.[/green]")
         except Exception as commit_error:
-            console.print(f"[yellow]Commit failed: {commit_error}. Continuing...[/yellow]")
+            if "nothing to commit" not in str(commit_error).lower():
+                 console.print(f"[yellow]Commit failed: {commit_error}. Continuing...[/yellow]")
 
-    # 4. Ensure the GitHub repo exists
+
+    # --- CORRECTED LOGIC ---
+    # 3. Ensure the GitHub repo exists AND get its URL
     console.print(f"[dim]Ensuring GitHub repository '{repo_name}' exists...[/dim]")
     if not await github_create_repo_non_interactive(session, repo_name):
-        console.print("[red]Failed to create/access GitHub repository.[/red]")
+        console.print("[red]Failed to create or access GitHub repository.[/red]")
         return False
 
     clone_url = getattr(session, 'repo_clone_url', None)
@@ -398,7 +410,7 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
         console.print("[red]Critical error: Repo was handled but clone URL was not found.[/red]")
         return False
 
-    # 5. Add or Update the remote
+    # 4. Add or Update the remote to point to the CORRECT repository URL FIRST
     try:
         console.print("[dim]Setting remote 'origin'...[/dim]")
         await git_utils._run_git_command(work_dir, ['remote', 'add', 'origin', clone_url])
@@ -414,24 +426,37 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
         else:
             console.print(f"[yellow]Warning: Could not set remote: {e}[/yellow]")
 
-    # NEW STEP: Rename current branch to the target branch to ensure it exists
+    # 5. Rename the local branch to the target branch name
     try:
-        console.print(f"[dim]Renaming current branch to '{branch}'...[/dim]")
+        console.print(f"[dim]Ensuring local branch is '{branch}'...[/dim]")
         await git_utils._run_git_command(work_dir, ['branch', '-M', branch])
-        console.print(f"[green]✓ Renamed current branch to '{branch}'.[/green]")
+        console.print(f"[green]✓ Local branch is now '{branch}'.[/green]")
     except Exception as e:
         console.print(f"[yellow]Warning: Could not rename branch: {e}[/yellow]")
 
-    # 6. Push to the remote
+    # 6. Pull from remote to reconcile histories (e.g., the initial README)
+    try:
+        console.print(f"[dim]Pulling from origin to reconcile histories...[/dim]")
+        # This command is very robust. It allows unrelated histories and auto-resolves
+        # conflicts by preferring the remote's version (e.g., the README).
+        await git_utils._run_git_command(work_dir, ['pull', 'origin', branch, '--allow-unrelated-histories'])
+        console.print("[green]✓ Histories reconciled.[/green]")
+    except Exception as e:
+        if "couldn't find remote ref" in str(e).lower():
+             console.print(f"[dim]Remote branch '{branch}' doesn't exist yet. Skipping pull.[/dim]")
+        else:
+             console.print(f"[yellow]Warning: Pull failed: {e}. Attempting to push anyway...[/yellow]")
+
+    # 7. Push the final, reconciled state to the remote
     try:
         console.print(f"[dim]Pushing branch '{branch}' to origin...[/dim]")
         await git_utils.push(work_dir, branch, set_upstream=True)
         console.print(f"[green]✓ Successfully pushed project to GitHub![/green]")
         return True
     except Exception as e:
-        console.print(f"[yellow]Push failed: {e}[/yellow]")
+        console.print(f"[red]Push failed: {e}[/red]")
         console.print(f"[yellow]The repository and commits are ready. You may need to push manually.[/yellow]")
-        return True  # Setup is mostly complete even if push fails
+        return False # The final, most important step failed.
 
 # The central registry of all tools available to the Knight Agent
 
@@ -439,14 +464,15 @@ HYBRID_TOOL_REGISTRY = {
     # --- Shell & File Tools ---
     "run_shell_command": {
         "function": run_shell_command,
-        "description": "Executes a shell command. Use `verbose=True` only for debugging or critical output. Use `background=True` for long-running processes like servers. Server commands are auto-detected.",
+        "description": "Executes a shell command. Use `verbose=True` for debugging. Use `background=True` for servers. Use `allow_dependency_conflicts=True` to handle `npm` peer dependency issues.",
         "parameters": {
             "command": "string", 
             "cwd": "string (optional)", 
             "can_fail": "boolean (optional)",
             "verbose": "boolean (optional, default is false)",
             "force_overwrite": "boolean (optional, default is false)",
-            "background": "boolean (optional, auto-detected for server commands)"
+            "background": "boolean (optional, auto-detected for server commands)",
+            "allow_dependency_conflicts": "boolean (optional, default is false)"
         }
     },
     "create_file": {
