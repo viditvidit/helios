@@ -80,6 +80,33 @@ class GitHubService:
             return self.gh.get_repo(repo_slug)
         except UnknownObjectException:
             raise GitHubServiceError(f"Repository '{repo_slug}' not found on GitHub or you lack permissions.")
+        
+    async def get_or_create_repo(self, repo_name: str, private: bool, description: str):
+        """
+        Gets a repository by name. If it doesn't exist, creates it.
+        This is a key method for making the agent's actions idempotent.
+        """
+        try:
+            # First, try to get the repo
+            repo = self.gh.get_repo(f"{self.user.login}/{repo_name}")
+            console.print(f"[yellow]✓ Found existing repository: {repo.full_name}[/yellow]")
+            return repo
+        except UnknownObjectException:
+            # If it doesn't exist, create it
+            console.print(f"[dim]Repository '{repo_name}' not found. Creating it...[/dim]")
+            try:
+                repo = self.user.create_repo(
+                    name=repo_name,
+                    private=private,
+                    description=description or "Created by Helios Agent",
+                    auto_init=True
+                )
+                console.print(f"[green]✓ Successfully created repository: {repo.full_name}[/green]")
+                return repo
+            except GithubException as e:
+                if e.status == 422: # Unprocessable Entity - often means repo already exists
+                    raise GitHubServiceError(f"Repository '{repo_name}' likely already exists on GitHub, but could not be accessed.")
+                raise GitHubServiceError(f"Failed to create repository: {e.data['message']}")
 
     async def create_repo(self, repo_name: str, private: bool = True, description: str = "") -> str:
         """Creates a new repository on GitHub."""

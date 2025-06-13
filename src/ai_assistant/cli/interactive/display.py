@@ -74,6 +74,8 @@ def show_help():
 
   [bold cyan]Agentic Mode:[/bold cyan]
   /knight <goal>           Activate the autonomous agent to achieve a high-level goal.
+  /knight_hybrid <goal>    Activate the advanced hybrid agent with web search and research tools.
+
 
  [bold cyan]Code Quality Commands:[/bold cyan]
   /optimize <filename>     Ask the AI to optimize/refactor a specific file.

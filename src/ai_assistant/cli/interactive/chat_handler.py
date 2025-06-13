@@ -70,7 +70,7 @@ class ChatHandler:
                 filename
             )
             console.print(Panel(Syntax(diff_text, "diff", theme="monokai"), title=f"Changes for {filename}", 
-                                border_style="#3776A1", title_style="#89CFF1"))
+                                border_style="#3776A1"))
             
             if apply_all:
                 files_to_apply[filename] = new_code

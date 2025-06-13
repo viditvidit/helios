@@ -79,7 +79,7 @@ class GitUtils:
     async def get_branches(self, repo_path: Path) -> str:
         """Get all local and remote branches."""
         return await self._run_git_command(repo_path, ['branch', '-a'])
-
+    '''
     async def _run_git_command(self, repo_path: Path, command: List[str]) -> str:
         """Runs a git command asynchronously using the safer exec method."""
         try:
@@ -99,7 +99,7 @@ class GitUtils:
             raise Exception(f"Git command failed: {e.stderr.decode('utf-8').strip()}")
         except Exception as e:
             raise Exception(f"An unexpected error occurred with git: {e}")
-    
+    '''
     async def get_current_branch(self, repo_path: Path) -> str:
         """Get current git branch"""
         return await self._run_git_command(repo_path, ['branch', '--show-current'])
@@ -123,7 +123,7 @@ class GitUtils:
             return True
         except Exception:
             return False
-    
+    '''
     async def commit(self, repo_path: Path, message: str) -> bool:
         """Commit changes"""
         try:
@@ -132,7 +132,7 @@ class GitUtils:
         except Exception as e:
             if "nothing to commit" in str(e): return False
             raise e
-    
+    '''
     async def push(self, repo_path: Path, branch: str, set_upstream: bool = False) -> bool:
         """Push changes to remote."""
         command = ['push', 'origin', branch]
@@ -149,3 +149,45 @@ class GitUtils:
         # The format string shows: commit hash (short), relative time, author, and subject
         format_str = "%C(yellow)%h%C(reset) %C(green)(%cr)%C(reset) %C(bold blue)<%an>%C(reset) %s"
         return await self._run_git_command(repo_path, ['log', f'--pretty=format:{format_str}', f'-n{count}'])
+    
+    async def _run_git_command(self, repo_path: Path, command: List[str]) -> str:
+        """Runs a git command asynchronously using the safer exec method."""
+        try:
+            process = await asyncio.create_subprocess_exec(
+                'git', *command,
+                cwd=repo_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+            
+            # --- THE FIX: Handle non-fatal exit codes gracefully ---
+            stdout_str = stdout.decode('utf-8').strip()
+            stderr_str = stderr.decode('utf-8').strip()
+
+            # The `commit` command can exit with 1 if there's nothing to commit. This is not an error.
+            if process.returncode != 0 and "nothing to commit" not in stdout_str:
+                 raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
+
+            return stdout_str
+        except FileNotFoundError:
+            raise Exception("Git not found. Please install Git.")
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Git command failed: {e.stderr.decode('utf-8').strip()}")
+        except Exception as e:
+            raise Exception(f"An unexpected error occurred with git: {e}")
+
+    async def commit(self, repo_path: Path, message: str) -> bool:
+        """Commit changes. Returns True if a commit was made, False otherwise."""
+        try:
+            # This call will now not raise an exception for "nothing to commit"
+            result = await self._run_git_command(repo_path, ['commit', '-m', message])
+            
+            # Check if the output indicates that no commit was made
+            if "nothing to commit" in result or "no changes added to commit" in result:
+                return False # No new commit was created
+            return True # A commit was successfully created
+        except Exception as e:
+            # Re-raise any other critical exceptions
+            raise e
+

@@ -6,7 +6,7 @@ import logging
 import re
 from pathlib import Path
 from typing import List, Optional, Dict
-import signal  # <-- Import signal
+import signal
 
 import click
 from rich.console import Console

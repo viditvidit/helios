@@ -17,6 +17,8 @@ class CommandHandler:
             if cmd == 'help': display.show_help()
             elif cmd == 'knight':
                 await actions_impl.handle_knight_mode(self.session, ' '.join(args))
+            elif cmd == 'knight_hybrid':
+                await actions_impl.handle_knight_hybrid_mode(self.session, ' '.join(args))
             elif cmd == 'index':
                 await actions_impl.handle_index(self.session)
             elif cmd == 'file': await actions.add_file_to_context(self.session, args[0] if args else "")
