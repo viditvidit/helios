@@ -5,6 +5,7 @@ from rich.syntax import Syntax
 
 from ..services.ai_service import AIService
 from ..models.request import CodeRequest
+from ..utils.file_utils import build_repo_context
 
 console = Console()
 
@@ -42,17 +43,26 @@ async def scan_repository(session):
     """Scans all files and asks the AI to identify areas for improvement."""
     console.print("[cyan]Scanning repository for potential improvements...[/cyan]")
     
-    file_contents = "\n\n".join([f"--- START {path} ---\n{content}\n--- END {path} ---" for path, content in session.current_files.items()])
+    # --- FIX: Load fresh, complete repository context to ensure scan is accurate ---
+    repo_path = Path.cwd()
+    all_files_content = build_repo_context(repo_path, session.config)
+
+    if not all_files_content:
+        console.print("[yellow]No files found in the repository to scan.[/yellow]")
+        return
+
+    file_contents_str = "\n\n".join([f"--- START {path} ---\n{content}\n--- END {path} ---" for path, content in all_files_content.items()])
     
     prompt = (
         "You are a senior code reviewer. Analyze the following files from a repository. "
         "Do not suggest code changes. Instead, provide a high-level report in markdown format. "
         "For each file that has issues, create a heading for the filename and use bullet points "
         "to list potential improvements, such as code smells, performance bottlenecks, or areas that lack clarity. "
-        "If a file is good, you don't need to mention it."
+        "If a file is good, you don't need to mention it. Be concise and focus on actionable feedback."
     )
     
-    request = CodeRequest(prompt=prompt, files={"repository_context": file_contents})
+    # Pass all file content as a single "repository_context" file to the AI
+    request = CodeRequest(prompt=prompt, files={"repository_context": file_contents_str})
     
     report = ""
     with console.status("[bold yellow]AI is reviewing your code...[/bold yellow]"):

@@ -65,7 +65,12 @@ class CommandHandler:
             elif cmd == 'pr_review': await actions_impl.handle_pr_review(self.session, args[0] if args else "")
 
             # Code Quality Commands
-            elif cmd == 'optimize': await actions_impl.handle_optimize_file(self.session, args[0] if args else "")
+            elif cmd == 'optimize':
+                filename_arg = args[0] if args else ""
+                # Allow using @mention syntax for the file
+                if filename_arg.startswith('@'):
+                    filename_arg = filename_arg[1:]
+                await actions_impl.handle_optimize_file(self.session, filename_arg)
             elif cmd == 'scan': await actions_impl.handle_scan(self.session)
 
             else:
