@@ -1,6 +1,6 @@
 import questionary
 
-from ...logic import file_logic, git_logic, github_logic, indexing_logic
+from ...logic import file_logic, git_logic, github_logic, indexing_logic, code_logic
 from ...services.github_service import GitHubService
 from ...utils.git_utils import GitUtils
 from rich.console import Console
@@ -29,6 +29,19 @@ async def handle_index(session):
     if file_contents:
         session.current_files.clear()
         session.current_files.update(file_contents)
+
+async def handle_optimize_file(session, filename: str):
+    """Handler for the /optimize command."""
+    if not filename: return console.print("[red]Usage: /optimize <filename>[/red]")
+    
+    optimized_content = await code_logic.optimize_file(session, filename)
+    if optimized_content:
+        # Piggyback on the main chat handler's code review UI
+        await session.chat_handler._handle_code_response(optimized_content)
+
+async def handle_scan(session):
+    """Handler for the /scan command."""
+    await code_logic.scan_repository(session)
 
 # --- Git & GitHub Operations ---
 async def handle_git_add(session, files: list[str]):
@@ -82,8 +95,19 @@ async def handle_pr_merge(session, pr_number_str: str):
 async def handle_create_repo(session):
     await github_logic.create_repo(session)
 
-async def handle_create_branch(session):
-    await github_logic.create_branch(session)
+async def handle_git_create_branch(session):
+    """Creates and switches to a new local branch."""
+    git_utils = GitUtils()
+    repo_path = Path.cwd()
+    if not await git_utils.is_git_repo(repo_path): return console.print("[red]Not a git repository.[/red]")
+    
+    branch_name = await questionary.text("Enter name for new local branch:").ask_async()
+    if not branch_name: return console.print("[red]Branch name cannot be empty.[/red]")
+    
+    if await git_utils.switch_branch(repo_path, branch_name, create=True):
+        console.print(f"[green]✓ Created and switched to new branch '{branch_name}'.[/green]")
+    else:
+        console.print(f"[red]Failed to create branch '{branch_name}'. It might already exist.[/red]")
 
 async def handle_create_issue(session):
     await github_logic.create_issue(session)

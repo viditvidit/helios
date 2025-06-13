@@ -31,8 +31,7 @@ common: &common_settings
     ```
 
     **General Rules:**
-    - If asked to explain a file, provide a concise explanation of its parts. Do not return the whole code unless asked, and DO NOT SKIP files when explaining.
-    - If asked to explain all files, provide a concise explanation of all of the files. Do not return their code unless asked, and DO NOT SKIP files when explaining.
+    - If asked to explain a file or all files, provide a technical explanation of its parts. Do not return the code unless asked, keep it limited to variable/classes/functions/etc only, and DO NOT SKIP files when explaining.
     - ONLY refer to files that exist in the provided directory, context, repository or all of them.
     - If asked about a file not in the context, state that you cannot see it.
     - If you don't see something in the provided context, say you don't see it rather than making assumptions.

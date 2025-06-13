@@ -1,154 +1,210 @@
+import asyncio
+import re
+from pathlib import Path
+from rich.console import Console
 from rich.panel import Panel
 from rich.live import Live
 from rich.spinner import Spinner
 from rich.markdown import Markdown
-from pathlib import Path
-from typing import Optional
-import asyncio
-import re
+from rich.syntax import Syntax
+import questionary
+from typing import Optional, List
 
 from ...services.ai_service import AIService
 from ...models.request import CodeRequest
 from ...utils.parsing_utils import extract_code_blocks
+from ...utils.file_utils import build_repo_context, FileUtils
 from . import display
+
+console = Console()
 
 class ChatHandler:
     def __init__(self, session):
         self.session = session
         self.config = session.config
-        self.console = display.console
         self._stop_generation = False
-        self._generation_task = None
-        self._indexed_file_paths = None
+        self._generation_task: Optional[asyncio.Task] = None
 
     def stop_generation(self):
-        """Stop the current AI response generation."""
         self._stop_generation = True
         if self._generation_task and not self._generation_task.done():
             self._generation_task.cancel()
+            console.print("\n[yellow]Stopping generation...[/yellow]")
 
-    def _extract_filenames_from_message(self, message: str) -> list[str]:
-        """Extracts potential file paths from a user's message."""
-        pattern = r'[\w/.-]+\.(?:py|js|ts|java|cpp|c|go|rs|rb|html|css|scss|json|yaml|yml|md|txt|sh|toml|ini|cfg)\b'
-        return re.findall(pattern, message)
-
-    def _resolve_filename_to_full_path(self, filename: str) -> Optional[str]:
-        """Searches the indexed file manifest to find the full relative path for a given filename."""
-        if self._indexed_file_paths is None:
-            if self.session.vector_store.metadata:
-                self._indexed_file_paths = {item['file_path'] for item in self.session.vector_store.metadata}
-            else: self._indexed_file_paths = set()
-        basename = Path(filename).name
-        matches = [p for p in self._indexed_file_paths if p.endswith(f'/{basename}') or p == basename]
-        if len(matches) == 1: return matches[0]
+    async def _find_file_in_project(self, filename: str) -> Optional[Path]:
+        """Searches for a file in the project directory."""
+        # Use Path.glob to find the file recursively
+        matches = list(self.config.work_dir.glob(f"**/{filename}"))
+        if len(matches) == 1:
+            return matches[0]
         elif len(matches) > 1:
-            self.console.print(f"[yellow]Ambiguous file mention: '{basename}' matched {len(matches)} files. Please be more specific.[/yellow]")
-            return None
+            # If multiple matches, ask the user to clarify
+            try:
+                chosen_path_str = await questionary.select(
+                    f"Found multiple files named '{filename}'. Please choose one:",
+                    choices=[str(p.relative_to(self.config.work_dir)) for p in matches]
+                ).ask_async()
+                return self.config.work_dir / chosen_path_str if chosen_path_str else None
+            except Exception:
+                return None # User cancelled
         return None
 
-    async def handle(self, message: str):
+    async def _handle_code_response(self, response_content: str):
+        """Interactively handles code blocks in the AI's response."""
+        code_blocks = [b for b in extract_code_blocks(response_content) if b.get('filename')]
+        if not code_blocks: return
+
+        console.print("\n[bold cyan]AI has suggested code changes. Reviewing now...[/bold cyan]")
+        
+        files_to_apply = {}
+        apply_all, skip_all = False, False
+
+        for block in code_blocks:
+            if skip_all: break
+            filename, new_code = block['filename'], block['code']
+            file_path = Path.cwd() / filename
+            
+            diff_text = FileUtils.generate_diff(
+                await self.session.file_service.read_file(file_path) if file_path.exists() else "",
+                new_code,
+                filename
+            )
+            console.print(Panel(Syntax(diff_text, "diff", theme="monokai"), title=f"Changes for {filename}", 
+                                border_style="#3776A1", title_style="#89CFF1"))
+            
+            if apply_all:
+                files_to_apply[filename] = new_code
+                continue
+
+            choice = await questionary.select(
+                f"Apply changes to {filename}?",
+                choices=["Yes", "No", "Apply All Remaining", "Skip All Remaining"],
+                use_indicator=True,
+                style=questionary.Style([
+                    ('selected', 'bg:#003A6B #89CFF1'),
+                    ('pointer', '#6EB1D6 bold'),
+                    ('instruction', '#5293BB'),
+                    ('answer', '#89CFF1 bold'),
+                    ('question', '#6EB1D6 bold')
+                ])
+            ).ask_async()
+
+            if choice == "Yes": files_to_apply[filename] = new_code
+            elif choice == "Apply All Remaining": apply_all = True; files_to_apply[filename] = new_code
+            elif choice == "Skip All Remaining": skip_all = True
+        
+        if not files_to_apply: return console.print("[yellow]No changes were applied.[/yellow]")
+
+        for filename, code in files_to_apply.items():
+            try:
+                await self.session.file_service.write_file(Path.cwd() / filename, code)
+                console.print(f"[green]✓ Applied changes to {filename}[/green]")
+            except Exception as e:
+                console.print(f"[red]Error applying changes to {filename}: {e}[/red]")
+
+    async def _stream_and_process_response(self, request: CodeRequest):
         """
-        Handles a user's chat message using a hybrid context strategy for speed and accuracy.
+        A dedicated coroutine to wrap the async generator and handle the streaming logic.
+        This is the correct pattern for use with asyncio.create_task.
         """
+        response_content = ""
+        
+        try:
+            async with AIService(self.config) as ai_service:
+                with Live(Spinner("dots", text=" Thinking..."), console=console, refresh_per_second=10, vertical_overflow="visible") as live:
+                    async for chunk in ai_service.stream_generate(request):
+                        if self._stop_generation:
+                            raise asyncio.CancelledError
+                        response_content += str(chunk)
+                        live.update(Markdown(response_content, code_theme="monokai"))
+            
+            self.session.last_ai_response_content = response_content
+            self.session.conversation_history.append({"role": "assistant", "content": response_content})
+            await self._handle_code_response(response_content)
+        except asyncio.CancelledError:
+            # Don't print a message here, the stop_generation method does it.
+            pass
+        except Exception as e:
+            console.print(f"[bold red]Error during response generation: {e}[/bold red]")
+
+
+    async def handle(self, message: str, session):
+        """Main message handler with corrected @mention and AIService usage."""
         try:
             self._stop_generation = False
-            final_context_files = {}
-
-            # --- Stage 1: Prioritize Explicitly Mentioned Files ---
-            # These are always included in full.
-            mentioned_files = self._extract_filenames_from_message(message)
-            if mentioned_files:
-                self.console.print(f"[dim]Found file mentions: {', '.join(mentioned_files)}[/dim]")
-                for file_path_str in mentioned_files:
-                    full_path = self._resolve_filename_to_full_path(file_path_str)
-                    if full_path:
-                        try:
-                            content = await self.session.file_service.read_file(Path(full_path))
-                            final_context_files[full_path] = content
-                            self.console.print(f"[dim]Loaded full context for: {full_path}[/dim]")
-                        except Exception as e:
-                            self.console.print(f"[yellow]Warning: Could not read file '{full_path}': {e}[/yellow]")
-                    else:
-                        self.console.print(f"[yellow]Warning: Could not find '{file_path_str}' in the project index.[/yellow]")
-
-            # --- Stage 2: Use Semantic Search for Supplemental Context ---
-            # Find relevant snippets from the rest of the repository.
-            with self.console.status("[dim]Searching for relevant code snippets...[/dim]", spinner="aesthetic"):
-                relevant_chunks = self.session.vector_store.search(message, k=10)
-
-            for chunk in relevant_chunks:
-                file_path = chunk['file_path']
-                # Add the snippet only if the entire file wasn't already included
-                if file_path not in final_context_files:
-                    if file_path not in final_context_files:
-                        final_context_files[file_path] = "" # Initialize if new
-                    # Append snippet with context marker
-                    final_context_files[file_path] += f"\n... (Relevant Snippet) ...\n{chunk['text']}\n"
             
-            if not final_context_files:
-                self.console.print("[yellow]Could not find specific context. The AI will answer from general knowledge.[/yellow]")
+            # --- Robust @mention Logic with File Finder ---
+            mentioned_context = {}
+            mentions = re.findall(r'@([^\s]+)', message)
+            
+            if mentions:
+                console.print("[dim]Processing @mentions...[/dim]")
+                for mention in mentions:
+                    # First check if it's a directory path
+                    dir_path = self.config.work_dir / mention
+                    if dir_path.is_dir():
+                        console.print(f"  [dim]Adding context from directory: {mention}[/dim]")
+                        try:
+                            # Use build_repo_context to get all files in the directory
+                            dir_context = build_repo_context(dir_path, self.config)
+                            for file_path, content in dir_context.items():
+                                relative_path = str(file_path.relative_to(self.config.work_dir))
+                                mentioned_context[relative_path] = content
+                        except Exception as e:
+                            console.print(f"[yellow]Warning: Could not read directory {mention}: {e}[/yellow]")
+                    else:
+                        # Check if it's a direct file path
+                        file_path = self.config.work_dir / mention
+                        if file_path.is_file():
+                            console.print(f"  [dim]Adding context from file: {mention}[/dim]")
+                            try:
+                                content = await self.session.file_service.read_file(file_path)
+                                mentioned_context[mention] = content
+                            except Exception as e:
+                                console.print(f"[yellow]Warning: Could not read file {mention}: {e}[/yellow]")
+                        else:
+                            # Try to find the file using fuzzy search
+                            found_path = await self._find_file_in_project(mention)
+                            if found_path:
+                                console.print(f"  [dim]Adding context from file: {found_path.relative_to(self.config.work_dir)}[/dim]")
+                                try:
+                                    content = await self.session.file_service.read_file(found_path)
+                                    mentioned_context[str(found_path.relative_to(self.config.work_dir))] = content
+                                except Exception as e:
+                                    console.print(f"[yellow]Warning: Could not read mentioned file {mention}: {e}[/yellow]")
+                            else:
+                                console.print(f"[yellow]Warning: Mentioned file '{mention}' not found in project.[/yellow]")
 
-            # --- Stage 3: Assemble the Final Request ---
-            self.session.conversation_history.append({"role": "user", "content": message})
+            # Semantic search for supplemental context
+            rag_context = {}
+            with console.status("[dim]Searching for relevant code snippets...[/dim]"):
+                relevant_chunks = self.session.vector_store.search(message, k=5)
+                for chunk in relevant_chunks:
+                    if chunk['file_path'] not in mentioned_context:
+                        if chunk['file_path'] not in rag_context:
+                            rag_context[chunk['file_path']] = ""
+                        rag_context[chunk['file_path']] += f"\n... (Snippet) ...\n{chunk['text']}\n"
+            
+            final_context = {**rag_context, **mentioned_context}
+
+            session.conversation_history.append({"role": "user", "content": message})
             
             request = CodeRequest(
                 prompt=message,
-                files=final_context_files, # The combined, intelligent context
-                repository_files=list(self.session.current_files.keys()), # The full file list for the tree view
-                conversation_history=self.session.conversation_history.copy(),
+                files=final_context,
+                repository_files=list(session.current_files.keys()),
+                conversation_history=session.conversation_history.copy(),
             )
 
+            # --- DEFINITIVE FIX for asyncio TypeError ---
+            # Create a task for the wrapper coroutine, not the generator itself.
             self._generation_task = asyncio.create_task(self._stream_and_process_response(request))
             await self._generation_task
 
         except asyncio.CancelledError:
-            self.console.print("\n[yellow]Response generation stopped by user.[/yellow]")
+             # This is expected when Ctrl+C is pressed, so we can ignore it here.
+            pass
         except Exception as e:
-            self.console.print(f"[bold red]Error handling chat message: {e}[/bold red]")
+            console.print(f"[bold red]Error handling chat message: {e}[/bold red]")
             import traceback
-            self.console.print(f"[dim]{traceback.format_exc()}[/dim]")
-
-    async def _stream_and_process_response(self, request: CodeRequest):
-        """Stream AI response and handle post-response actions."""
-        response_content = ""
-        is_first_chunk = True
-        spinner = Spinner("bouncingBall", text=" Thinking...")
-        live_panel = Panel(spinner, border_style="green", title="AI Assistant (Press Ctrl+C to stop)", title_align="left")
-
-        try:
-            with Live(live_panel, console=self.console, refresh_per_second=10, auto_refresh=True, vertical_overflow="visible") as live:
-                async with AIService(self.config) as ai_service:
-                    async for chunk in ai_service.stream_generate(request):
-                        if self._stop_generation:
-                            raise asyncio.CancelledError("Generation stopped by user")
-                        if is_first_chunk:
-                            response_content = chunk.lstrip()
-                            is_first_chunk = False
-                        else:
-                            response_content += chunk
-                        markdown_view = Markdown(response_content, code_theme="monokai", inline_code_theme="monokai")
-                        live.update(Panel(markdown_view, border_style="green", title="AI Assistant (Press Ctrl+C to stop)", title_align="left"))
-            
-            if is_first_chunk and not self._stop_generation:
-                self.console.print(Panel("[yellow]The AI did not provide a response. This could be due to a model issue or connection problem.[/yellow]", border_style="yellow"))
-                return
-
-            if not self._stop_generation:
-                self.session.last_ai_response_content = response_content
-                self.session.conversation_history.append({"role": "assistant", "content": response_content})
-                code_blocks = extract_code_blocks(response_content)
-                if code_blocks:
-                    display.show_code_suggestions()
-                    
-        except asyncio.CancelledError:
-            if response_content:
-                self.console.print(f"\n[yellow]Partial response received before stopping:[/yellow]")
-                self.session.last_ai_response_content = response_content
-            raise
-        except Exception as e:
-            if "timed out" in str(e).lower():
-                self.console.print(Panel("[yellow]⏱️ The AI model is taking longer than expected to respond.[/yellow]", border_style="yellow", title="Timeout"))
-            else:
-                self.console.print(f"[red]Error generating AI response: {e}[/red]")
-                import traceback
-                self.console.print(f"[dim]{traceback.format_exc()}[/dim]")
+            console.print(f"[dim]{traceback.format_exc()}[/dim]")

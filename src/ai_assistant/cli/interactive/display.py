@@ -31,6 +31,7 @@ def show_help():
     help_text = """
 [bold cyan]General Commands:[/bold cyan]
   /help                    Show this help message
+  @<file_or_dir>           Mention a file or directory within your prompt to add it to context.
   /file <path>             Add a file to context
   /files                   List files in current context
   /clear                   Clear conversation history
@@ -70,6 +71,10 @@ def show_help():
   /pr_approve <#>          Approve a Pull Request.
   /pr_comment <#>          Add a comment to a Pull Request.
   /pr_merge <#>            Merge a Pull Request.
+
+ [bold cyan]Code Quality Commands:[/bold cyan]
+  /optimize <filename>     Ask the AI to optimize/refactor a specific file.
+  /scan                    Perform a high-level scan of the repository for potential improvements. 
 
 [bold cyan]AI-Powered Review Commands:[/bold cyan]
   /repo_summary            Get an AI-generated summary of the entire repository.

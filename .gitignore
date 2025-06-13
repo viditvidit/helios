@@ -10,3 +10,4 @@ __pycache__/
 ai_assistant.log
 .helios
 .DS_Store
+session-statbar.py

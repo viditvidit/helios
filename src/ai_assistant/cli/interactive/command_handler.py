@@ -37,7 +37,7 @@ class CommandHandler:
             elif cmd == 'review':
                 show_diff = '-d' in args
                 await actions_impl.handle_review(self.session, show_diff=show_diff)
-            elif cmd == 'create_branch': await actions_impl.handle_create_branch(self.session)
+            elif cmd == 'create_branch': await actions_impl.handle_git_create_branch(self.session)
             elif cmd == 'create_pr': await actions_impl.handle_create_pr(self.session)
             elif cmd == 'pr_approve':
                 await actions_impl.handle_pr_approve(self.session, args[0] if args else "")
@@ -59,6 +59,10 @@ class CommandHandler:
             # New AI Review Commands
             elif cmd == 'repo_summary': await actions_impl.handle_repo_summary(self.session)
             elif cmd == 'pr_review': await actions_impl.handle_pr_review(self.session, args[0] if args else "")
+
+            # Code Quality Commands
+            elif cmd == 'optimize': await actions_impl.handle_optimize_file(self.session, args[0] if args else "")
+            elif cmd == 'scan': await actions_impl.handle_scan(self.session)
 
             else:
                 self.console.print(f"[red]Unknown command: /{cmd}[/red]")
