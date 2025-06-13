@@ -4,12 +4,39 @@ from rich.panel import Panel
 from rich.table import Table
 import questionary
 from typing import List, Optional
+import os
 
 from ..services.github_service import GitHubService
 from ..utils.git_utils import GitUtils
 from ..core.exceptions import GitHubServiceError, NotAGitRepositoryError
 
 console = Console()
+
+async def ensure_github_credentials(session):
+    """Checks for GitHub credentials and prompts the user if they are missing."""
+    token = session.config.github.token or os.getenv("GITHUB_TOKEN")
+    if token:
+        return True # Credentials already exist
+
+    console.print("[bold yellow]GitHub credentials not found.[/bold yellow]")
+    token = await questionary.password("Please enter your GitHub Personal Access Token (it will be hidden):").ask_async()
+    
+    if not token:
+        console.print("[red]GitHub token is required to proceed with GitHub operations. Aborting.[/red]")
+        return False
+        
+    # Store for the current session
+    session.config.github.token = token
+    
+    # Re-initialize the service with the new token
+    try:
+        session.github_service = GitHubService(session.config)
+        console.print(f"[green]✓ Authenticated with GitHub as {session.github_service.user.login}.[/green]")
+        return True
+    except Exception as e:
+        console.print(f"[red]Authentication failed: {e}[/red]")
+        session.config.github.token = None # Clear invalid token
+        return False
 
 async def create_repo(session):
     """Logic to interactively create a new GitHub repository."""
@@ -203,7 +230,6 @@ async def list_issues(session, assignee_filter: Optional[str]):
         
         console.print(table)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
-        console.print(f"[red]Error: {e}[/red]")
         console.print(f"[red]Error: {e}[/red]")
 
 async def list_prs(session):

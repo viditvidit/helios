@@ -6,6 +6,7 @@ from ..services.file_service import FileService
 
 console = Console()
 
+'''
 async def new_file(file_path_str: str, current_files: dict):
     """Logic to create a new empty file."""
     if not file_path_str:
@@ -46,6 +47,63 @@ async def save_code(session, filename: str):
         console.print(f"[green]✓ {relative_path_str} is now in the active context.[/green]")
     except Exception as e:
         console.print(f"[red]Error saving file: {e}[/red]")
+'''
+
+async def new_file(session, file_path_str: str, current_files: dict):
+    """Logic to create a new empty file using the centralized FileService."""
+    if not file_path_str:
+        console.print("[red]Usage: /new <filename>[/red]")
+        return False # Return status for agent
+    
+    # Use the FileService's work_dir as the base
+    path = session.file_service.work_dir.joinpath(file_path_str)
+
+    if path.exists():
+        console.print(f"[yellow]File already exists: {file_path_str}[/yellow]")
+        return True # It exists, so the goal is met
+
+    try:
+        # Use the file_service to handle the write operation, ensuring security.
+        # Writing an empty string creates the file.
+        await session.file_service.write_file(path, "")
+        
+        relative_path_str = str(path.relative_to(Path.cwd()))
+        current_files[relative_path_str] = ""
+        console.print(f"[green]✓ Created new file and added to context: {relative_path_str}[/green]")
+        return True
+    except Exception as e:
+        console.print(f"[red]Error creating file: {e}[/red]")
+        return False
+
+# --- MODIFIED TO PASS THE SESSION OBJECT ---
+async def save_code(session, filename: str):
+    """Logic to save the last code block to a file."""
+    if not filename:
+        console.print("[red]Usage: /save <filename>[/red]")
+        return False
+    if not session.last_ai_response_content:
+        console.print("[red]No AI response available to save from.[/red]")
+        return False
+
+    code_blocks = extract_code_blocks(session.last_ai_response_content)
+    if not code_blocks:
+        console.print("[red]No code blocks found in the last AI response.[/red]")
+        return False
+
+    code_to_save = code_blocks[0]['code']
+    path = session.file_service.work_dir.joinpath(filename)
+    action_verb = "Updated" if path.exists() else "Created"
+    
+    try:
+        await session.file_service.write_file(path, code_to_save)
+        console.print(f"[green]✓ {action_verb} file: {filename}[/green]")
+        relative_path_str = str(path.relative_to(Path.cwd()))
+        session.current_files[relative_path_str] = code_to_save
+        console.print(f"[green]✓ {relative_path_str} is now in the active context.[/green]")
+        return True
+    except Exception as e:
+        console.print(f"[red]Error saving file: {e}[/red]")
+        return False
 
 async def apply_changes(session):
     """Logic to apply all code blocks from the last response to their files."""

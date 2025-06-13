@@ -1,9 +1,10 @@
 import questionary
 
-from ...logic import file_logic, git_logic, github_logic, indexing_logic, code_logic
+from ...logic import file_logic, git_logic, github_logic, indexing_logic, code_logic, agentic_logic, agentic_logic_hybrid
 from ...services.github_service import GitHubService
 from ...utils.git_utils import GitUtils
 from rich.console import Console
+from pathlib import Path
 
 console = Console()
 
@@ -178,3 +179,12 @@ async def handle_pr_request_review(session, args):
     pr_number = args[0] if len(args) > 0 else ""
     reviewers = args[1:]
     await github_logic.request_pr_reviewers(session, pr_number, reviewers)
+
+# --- NEW Agentic Command ---
+async def handle_knight_mode(session, goal: str):
+    """Dispatcher for the /knight agentic mode."""
+    await agentic_logic.run_knight_mode(session, goal)
+
+async def handle_knight_hybrid_mode(session, goal: str):
+    """Dispatcher for the more powerful /knight_hybrid agentic mode."""
+    await agentic_logic_hybrid.run_knight_hybrid_mode(session, goal)

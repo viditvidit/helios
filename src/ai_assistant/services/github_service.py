@@ -19,15 +19,27 @@ class GitHubService:
     def __init__(self, config: Config):
         self.config = config
         self.git_utils = GitUtils()
-        token = os.getenv("GITHUB_TOKEN")
-        if not token:
-            raise GitHubServiceError("GITHUB_TOKEN is not set in your environment. Please set it in your .env file.")
+        token = self.config.github.token or os.getenv("GITHUB_TOKEN")
         
-        self.gh = Github(token)
+        if not token:
+            # Don't raise an error immediately. The agent will handle prompting the user.
+            self.gh = None
+            self.user = None
+            return
+
         try:
+            self.gh = Github(token)
             self.user = self.gh.get_user()
+            # Store the successfully used token and username in the config
+            self.config.github.token = token
+            self.config.github.username = self.user.login
         except Exception as e:
             raise GitHubServiceError(f"Failed to authenticate with GitHub. Please check your GITHUB_TOKEN. Error: {e}")
+
+    async def _get_repo_object(self):
+        """Helper to get the PyGithub Repository object for the current directory."""
+        if not self.gh:
+            raise GitHubServiceError("GitHub token not configured. Agent could not prompt for credentials.")
 
     async def get_repository_context(self, repo_path: Path = None) -> dict:
         """
@@ -68,6 +80,33 @@ class GitHubService:
             return self.gh.get_repo(repo_slug)
         except UnknownObjectException:
             raise GitHubServiceError(f"Repository '{repo_slug}' not found on GitHub or you lack permissions.")
+        
+    async def get_or_create_repo(self, repo_name: str, private: bool, description: str):
+        """
+        Gets a repository by name. If it doesn't exist, creates it.
+        This is a key method for making the agent's actions idempotent.
+        """
+        try:
+            # First, try to get the repo
+            repo = self.gh.get_repo(f"{self.user.login}/{repo_name}")
+            console.print(f"[yellow]✓ Found existing repository: {repo.full_name}[/yellow]")
+            return repo
+        except UnknownObjectException:
+            # If it doesn't exist, create it
+            console.print(f"[dim]Repository '{repo_name}' not found. Creating it...[/dim]")
+            try:
+                repo = self.user.create_repo(
+                    name=repo_name,
+                    private=private,
+                    description=description or "Created by Helios Agent",
+                    auto_init=True
+                )
+                console.print(f"[green]✓ Successfully created repository: {repo.full_name}[/green]")
+                return repo
+            except GithubException as e:
+                if e.status == 422: # Unprocessable Entity - often means repo already exists
+                    raise GitHubServiceError(f"Repository '{repo_name}' likely already exists on GitHub, but could not be accessed.")
+                raise GitHubServiceError(f"Failed to create repository: {e.data['message']}")
 
     async def create_repo(self, repo_name: str, private: bool = True, description: str = "") -> str:
         """Creates a new repository on GitHub."""

@@ -11,3 +11,4 @@ ai_assistant.log
 .helios
 .DS_Store
 session-statbar.py
+agent_tests/
