@@ -97,32 +97,6 @@ def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
             console.print(traceback.format_exc())
         sys.exit(1)
 
-@cli.command()
-@click.argument('prompt', nargs=-1)
-@click.option('--file', '-f', multiple=True, help='Include file in context')
-@click.option('--diff', is_flag=True, help='Show diff for changes')
-@click.option('--apply', is_flag=True, help='Apply changes automatically')
-@click.pass_context
-def code(ctx, prompt, file, diff, apply):
-    """Generate or modify code based on a prompt (non-interactive)."""
-    if not prompt:
-        console.print("[yellow]Please provide a prompt for the code command.[/yellow]")
-        return
-    asyncio.run(_code_command(ctx, prompt, file, diff, apply))
-
-async def _code_command(ctx, prompt, files, diff, apply):
-    try:
-        cmd = CodeCommands(ctx.obj)
-        await cmd.generate_code(
-            prompt=" ".join(prompt),
-            files=list(files),
-            show_diff=diff,
-            apply_changes=apply
-        )
-    except AIAssistantError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        sys.exit(1)
-
 def main():
     cli()
 
