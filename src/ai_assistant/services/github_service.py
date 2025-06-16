@@ -273,7 +273,7 @@ class GitHubService:
         repo = await self._get_repo_object()
         
         # Add the signature
-        signature = "\n\n[###### Assisted by Helios ######]"
+        signature = "\n\n###### Assisted by Helios Agent"
         full_body = f"{body}{signature}"
 
         try:

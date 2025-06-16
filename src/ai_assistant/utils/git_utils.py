@@ -160,30 +160,35 @@ class GitUtils:
         return await self._run_git_command(repo_path, ['log', f'--pretty=format:{format_str}', f'-n{count}'])
     
     async def _run_git_command(self, repo_path: Path, command: List[str]) -> str:
-        """Runs a git command asynchronously using the safer exec method."""
-        try:
-            process = await asyncio.create_subprocess_exec(
-                'git', *command,
-                cwd=repo_path,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-            
-            stdout_str = stdout.decode('utf-8').strip()
+         """Runs a git command asynchronously using the safer exec method."""
+         try:
+             process = await asyncio.create_subprocess_exec(
+                 'git', *command,
+                 cwd=repo_path,
+                 stdout=asyncio.subprocess.PIPE,
+                 stderr=asyncio.subprocess.PIPE
+             )
+             stdout, stderr = await process.communicate()
 
-            if process.returncode != 0:
-                # Allow 'nothing to commit' to pass without error
-                if "nothing to commit" not in stdout_str and "nothing to commit" not in stderr.decode('utf-8'):
-                    raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
+             stdout_str = stdout.decode('utf-8', errors='ignore').strip()
+             stderr_str = stderr.decode('utf-8', errors='ignore').strip()
 
-            return stdout_str
-        except FileNotFoundError:
-            raise Exception("Git not found. Please install Git.")
-        except subprocess.CalledProcessError as e:
-            raise Exception(f"Git command failed: {e.stderr.decode('utf-8').strip()}")
-        except Exception as e:
-            raise Exception(f"An unexpected error occurred with git: {e}")
+             if process.returncode != 0:
+                 # raise so we can catch below with full output
+                 raise subprocess.CalledProcessError(
+                     process.returncode, command, output=stdout, stderr=stderr
+                )
+
+             return stdout_str
+         except FileNotFoundError:
+             raise Exception("Git not found. Please install Git.")
+         except subprocess.CalledProcessError as e:
+             out = e.output.decode('utf-8', errors='ignore').strip() if e.output else ""
+             err = e.stderr.decode('utf-8', errors='ignore').strip() if e.stderr else ""
+             msg = err or out or f"exit code {e.returncode}"
+             raise Exception(f"Git command failed: {msg}")
+         except Exception as e:
+             raise Exception(f"An unexpected error occurred with git: {e}")
 
     async def commit(self, repo_path: Path, message: str) -> bool:
         """Commit changes. Returns True if a commit was made, False otherwise."""
