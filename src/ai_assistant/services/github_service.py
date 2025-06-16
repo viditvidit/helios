@@ -163,7 +163,6 @@ class GitHubService:
         summary = ""
         try:
             async with AIService(self.config) as ai_service:
-                # Use a shorter timeout for these small, quick summaries
                 ai_service.session.timeout.total = 60 
                 async for chunk in ai_service.stream_generate(request):
                     summary += chunk
@@ -255,7 +254,6 @@ class GitHubService:
         except GithubException as e:
             raise GitHubServiceError(f"Failed to create issue: {e}")
         
-    # --- NEW: Check for existing PRs ---
     async def check_for_open_pr(self, branch_name: str) -> Optional[str]:
         """Checks if an open PR already exists for a given branch."""
         repo = await self._get_repo_object()
@@ -267,7 +265,6 @@ class GitHubService:
         except GithubException:
             return None # Fail gracefully if there's an issue
 
-    # --- UPDATED: Add Helios signature to PR body ---
     async def create_pull_request(self, title: str, body: str, head_branch: str, base_branch: str) -> str:
         """Creates a pull request with the Helios signature."""
         repo = await self._get_repo_object()

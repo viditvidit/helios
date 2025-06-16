@@ -37,8 +37,6 @@ class VectorStore:
     def embedding_model(self) -> SentenceTransformer:
         """Lazy-loads the sentence transformer model when first accessed."""
         if self._embedding_model is None:
-            # Remove the console.status to avoid conflicts with other Rich displays
-            #console.print("[dim]Loading embedding model (first-time use)...[/dim]")
             self._embedding_model = SentenceTransformer(self.EMBEDDING_MODEL)
         return self._embedding_model
 
@@ -105,7 +103,6 @@ class VectorStore:
             return
             
         with console.status("[bold yellow]Creating embeddings...[/bold yellow]", spinner="point"):
-            # Disable the sentence-transformers progress bar to clean up UI
             embeddings = self.embedding_model.encode(all_chunks_text, show_progress_bar=False)
         
         dimension = embeddings.shape[1]

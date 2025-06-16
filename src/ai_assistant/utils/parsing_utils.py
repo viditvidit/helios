@@ -11,7 +11,6 @@ def extract_code_blocks(text: str) -> List[Dict[str, str]]:
     - ```path/to/file.py
     Returns a list of dictionaries, each with 'language' and 'filename'.
     """
-    # A simpler, more robust regex to capture the entire info string and the code
     code_block_regex = re.compile(r"```([^\n]*)\n(.*?)\n```", re.DOTALL)
     
     extracted_items = []

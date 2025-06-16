@@ -174,7 +174,6 @@ class GitUtils:
              stderr_str = stderr.decode('utf-8', errors='ignore').strip()
 
              if process.returncode != 0:
-                 # raise so we can catch below with full output
                  raise subprocess.CalledProcessError(
                      process.returncode, command, output=stdout, stderr=stderr
                 )

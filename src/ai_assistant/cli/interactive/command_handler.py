@@ -13,6 +13,7 @@ class CommandHandler:
         args = parts[1:]
 
         try:
+            
             # General Commands
             if cmd == 'help': display.show_help()
             elif cmd == 'knight':

@@ -1,8 +1,5 @@
 from rich.console import Console
 from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
-from rich.columns import Columns
 from pyfiglet import Figlet
 from typing import Dict
 import os

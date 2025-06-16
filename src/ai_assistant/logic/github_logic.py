@@ -243,13 +243,9 @@ async def list_issues(session, assignee_filter: Optional[str]):
     try:
         service = GitHubService(session.config)
         
-        # --- NEW DEFAULT LOGIC ---
-        # If no filter is provided, default to '*' (any assigned issue).
-        # This is more useful than showing everything including unassigned issues.
         if assignee_filter is None:
             assignee_filter = '*'
 
-        # Build user-friendly text for the status message
         filter_text = ""
         if assignee_filter:
             if assignee_filter.lower() == 'none':

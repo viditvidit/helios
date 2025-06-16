@@ -7,21 +7,19 @@ from typing import Optional, Iterable
 from rich.console import Console
 import questionary
 
-# --- PROMPT_TOOLKIT IMPORTS ---
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion, FuzzyCompleter
 from prompt_toolkit.formatted_text import StyleAndTextTuples
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory, Suggestion
-
 from prompt_toolkit.styles import Style
 
+from .command_handler import CommandHandler
+from .chat_handler import ChatHandler
+from . import display
 from ...core.config import Config
 from ...services.file_service import FileService
 from ...services.github_service import GitHubService
 from ...services.vector_store import VectorStore
-from .command_handler import CommandHandler
-from .chat_handler import ChatHandler
-from . import display
 from ...logic import indexing_logic
 from ...utils.git_utils import GitUtils
 

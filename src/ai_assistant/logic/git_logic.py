@@ -1,10 +1,9 @@
-# src/ai_assistant/logic/git_logic.py
-
-from pathlib import Path
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.panel import Panel
 from rich.text import Text
+
+from pathlib import Path
 import questionary
 import re
 

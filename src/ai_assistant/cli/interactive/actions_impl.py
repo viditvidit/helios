@@ -1,10 +1,10 @@
 import questionary
+from rich.console import Console
+from pathlib import Path
 
 from ...logic import file_logic, git_logic, github_logic, indexing_logic, code_logic, agentic_logic, agentic_logic_hybrid
 from ...services.github_service import GitHubService
 from ...utils.git_utils import GitUtils
-from rich.console import Console
-from pathlib import Path
 
 console = Console()
 
