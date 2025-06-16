@@ -415,7 +415,7 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
                 cwd=run_dir
             )
             if not verbose:
-                with console.status(f"[dim]Executing...[/dim]", spinner="dots"):
+                with console.status(f"[dim]Executing...[/dim]", spinner="points"):
                     stdout, stderr = await process.communicate()
             else:
                 stdout, stderr = await process.communicate()

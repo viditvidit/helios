@@ -36,6 +36,7 @@ async def run_indexing(config: Config) -> dict:
         if not file_contents:
             console.print("[yellow]No supported files found to index.[/yellow]")
             return {}
+        console.print(f"[dim]Found {len(file_contents)} files to process.[/dim]")
 
         with console.status(f"[cyan]Indexing {len(file_contents)} files...[/cyan]", spinner="dots"):
             vector_store = VectorStore(config)

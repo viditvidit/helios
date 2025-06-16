@@ -94,7 +94,7 @@ class VectorStore:
         all_chunks_text = []
         self._metadata = [] # Reset metadata before re-indexing
 
-        for file_path, content in track(file_contents.items(), description="[cyan]Chunking files...[/cyan]"):
+        for file_path, content in track(file_contents.items(), description="[dim][cyan]Chunking files...[/cyan][/dim]"):
             chunks = text_splitter.split_text(content)
             for i, chunk in enumerate(chunks):
                 all_chunks_text.append(chunk)
@@ -104,17 +104,17 @@ class VectorStore:
             console.print("[yellow]No text chunks were generated from files.[/yellow]")
             return
             
-        with console.status("[bold yellow]Creating embeddings... (This can take a while)[/bold yellow]", spinner="moon"):
-            # This line will now trigger the lazy load of the embedding_model property
-            embeddings = self.embedding_model.encode(all_chunks_text, show_progress_bar=True)
+        with console.status("[bold yellow]Creating embeddings...[/bold yellow]", spinner="point"):
+            # Disable the sentence-transformers progress bar to clean up UI
+            embeddings = self.embedding_model.encode(all_chunks_text, show_progress_bar=False)
         
         dimension = embeddings.shape[1]
         self._index = faiss.IndexFlatL2(dimension)
         self._index.add(embeddings)
         
-        console.print(f"[green]Generated and indexed {self._index.ntotal} text chunks.[/green]")
+        console.print(f"[dim][green]Generated and indexed {self._index.ntotal} text chunks.[/green][/dim]")
         self.save()
-        console.print(f"[green]Index saved to {self.index_path}[/green]")
+        console.print(f"[dim][green]Index saved to {self.index_path}[/green][/dim]")
 
 
     def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
