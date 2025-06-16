@@ -29,25 +29,27 @@ console = Console()
 
 # --- NEW: Custom Completer for file paths ---
 class FilePathCompleter(Completer):
-    def __init__(self, file_list: list[str]):
-        self.file_list = sorted(list(set(file_list)))
+    def __init__(self, session):
+        self.session = session  # Reference to session for dynamic file list
     
     def get_completions(self, document, complete_event) -> Iterable[Completion]:
-            """Yields all possible file paths for the fuzzy completer to filter."""
-            text_before_cursor = document.text_before_cursor
-            
-            # Only trigger if there's an '@' and no space after it yet
-            if '@' in text_before_cursor:
-                word_before_cursor = document.get_word_before_cursor(WORD=True)
-                if word_before_cursor.startswith('@'):
-                    # The word we are completing is after the '@'
-                    search_text = word_before_cursor[1:]
-                    for path in self.file_list:
-                        yield Completion(
-                            path,
-                            start_position=-len(search_text),
-                            display=path
-                        )
+        """Yields all possible file paths for the fuzzy completer to filter."""
+        text_before_cursor = document.text_before_cursor
+        
+        # Only trigger if there's an '@' and no space after it yet
+        if '@' in text_before_cursor:
+            word_before_cursor = document.get_word_before_cursor(WORD=True)
+            if word_before_cursor.startswith('@'):
+                # The word we are completing is after the '@'
+                search_text = word_before_cursor[1:]
+                # Get current file list dynamically from session
+                current_files = sorted(list(set(self.session.current_files.keys())))
+                for path in current_files:
+                    yield Completion(
+                        path,
+                        start_position=-len(search_text),
+                        display=path
+                    )
 
     '''def get_completions(self, document, complete_event):
         """Return completions for file paths when @ symbol is used."""
@@ -114,8 +116,8 @@ class InteractiveSession:
         display.show_welcome()
 
         # --- NEW: Setup prompt_toolkit session with custom styles and fuzzy completer ---
-        # Create a completer that wraps our file path provider with fuzzy logic
-        file_completer = FilePathCompleter(list(self.current_files.keys()))
+        # Create a completer that gets file list dynamically from session
+        file_completer = FilePathCompleter(self)  # Pass session instead of static file list
         fuzzy_file_completer = FuzzyCompleter(file_completer)
 
         # Custom styles for the autocomplete menu

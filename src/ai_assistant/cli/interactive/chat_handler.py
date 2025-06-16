@@ -208,3 +208,20 @@ class ChatHandler:
             console.print(f"[bold red]Error handling chat message: {e}[/bold red]")
             import traceback
             console.print(f"[dim]{traceback.format_exc()}[/dim]")
+
+    async def _handle_ai_response(self, response_content: str):
+        """Process AI response and handle any code blocks or file operations."""
+        self.session.last_ai_response_content = response_content
+        
+        # Check if the response contains code blocks that might need to be applied
+        code_blocks = extract_code_blocks(response_content)
+        if code_blocks:
+            # Check if any code blocks have file paths (indicating they should be saved)
+            has_file_paths = any(block.get('filepath') for block in code_blocks)
+            
+            if has_file_paths:
+                console.print("\n[yellow]💡 AI has suggested code changes.[/yellow]")
+                console.print("[dim]Use /apply to review and apply changes, or /save <filename> to save manually.[/dim]")
+                # DO NOT automatically apply - let user decide
+            else:
+                console.print("\n[dim]💡 Code generated. Use /save <filename> to save if needed.[/dim]")

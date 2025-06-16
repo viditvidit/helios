@@ -27,7 +27,7 @@ class CommandHandler:
             elif cmd == 'repo': await actions.show_repository_stats(self.session)
             elif cmd == 'model': await actions.switch_model(self.session, args[0] if args else None)
             elif cmd == 'save_conversation': await actions.save_conversation(self.session, args[0] if args else "")
-            elif cmd == 'new': await actions_impl.handle_new_file(self.session, args[0] if args else "")
+            elif cmd == 'new': await actions_impl.handle_new_file(self.session, ' '.join(args))
             elif cmd == 'save': await actions_impl.handle_save_last_code(self.session, args[0] if args else "")
             elif cmd == 'apply': await actions_impl.handle_apply_changes(self.session)
             

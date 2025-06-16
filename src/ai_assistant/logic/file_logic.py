@@ -49,26 +49,44 @@ async def save_code(session, filename: str):
         console.print(f"[red]Error saving file: {e}[/red]")
 '''
 
-async def new_file(session, file_path_str: str, current_files: dict):
+async def new_file(session, file_path_str: str):
     """Logic to create a new empty file using the centralized FileService."""
     if not file_path_str:
-        console.print("[red]Usage: /new <filename>[/red]")
-        return False # Return status for agent
+        console.print("[red]Usage: /new <filename> [@directory][/red]")
+        return False
     
-    # Use the FileService's work_dir as the base
-    path = session.file_service.work_dir.joinpath(file_path_str)
+    # Parse the input to separate filename and directory
+    parts = file_path_str.split()
+    filename = parts[0]
+    
+    # Check if there's a directory specified with @
+    target_dir = None
+    for part in parts[1:]:
+        if part.startswith('@'):
+            target_dir = part[1:]  # Remove the @ symbol
+            break
+    
+    # Construct the full path
+    if target_dir:
+        # Use the specified directory relative to work_dir
+        path = session.file_service.work_dir.joinpath(target_dir, filename)
+    else:
+        # Use work_dir as base
+        path = session.file_service.work_dir.joinpath(filename)
 
     if path.exists():
-        console.print(f"[yellow]File already exists: {file_path_str}[/yellow]")
-        return True # It exists, so the goal is met
+        console.print(f"[yellow]File already exists: {path.relative_to(session.file_service.work_dir)}[/yellow]")
+        return True
 
     try:
-        # Use the file_service to handle the write operation, ensuring security.
-        # Writing an empty string creates the file.
+        # Create parent directories if they don't exist
+        path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Use the file_service to handle the write operation
         await session.file_service.write_file(path, "")
         
-        relative_path_str = str(path.relative_to(Path.cwd()))
-        current_files[relative_path_str] = ""
+        relative_path_str = str(path.relative_to(session.file_service.work_dir))
+        session.current_files[relative_path_str] = ""
         console.print(f"[green]✓ Created new file and added to context: {relative_path_str}[/green]")
         return True
     except Exception as e:

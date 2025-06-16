@@ -10,9 +10,10 @@ console = Console()
 
 # --- File Operations ---
 async def handle_new_file(session, file_path: str):
-    await file_logic.new_file(file_path, session.current_files)
-    # Ask to re-index
-    if await questionary.confirm("Re-index repository to include this new file?", default=True, auto_enter=False).ask_async():
+    success = await file_logic.new_file(session, file_path)
+    # Auto-index after successful file creation
+    if success:
+        console.print("[cyan]Auto-indexing repository to include the new file...[/cyan]")
         await handle_index(session)
 
 async def handle_save_last_code(session, filename: str):
