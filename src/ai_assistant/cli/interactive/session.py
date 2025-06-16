@@ -125,13 +125,17 @@ class InteractiveSession:
             'completion-menu.completion.current': 'bg:#333333 #ffffff', # Selected item
             'completion-menu.completion': 'bg:#1a1a1a #666666',      # Other items
             'completion-menu.meta.completion.current': 'bg:#333333 #cccccc',
-            'completion-menu.meta.completion': 'bg:#1a1a1a #444444'
+            'completion-menu.meta.completion': 'bg:#1a1a1a #444444',
+            '': '#00d7ff bold',  # Default text color (cyan, bold)
+            'prompt': '#ffffff bold',  # Prompt symbol color
         })
 
         prompt_session = PromptSession(
+            message=[('class:prompt', '> ')],
             completer=fuzzy_file_completer,
             complete_while_typing=True,
-            style=style
+            style=style,
+            input_processors=[],
         )
 
         while True:

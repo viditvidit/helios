@@ -30,59 +30,59 @@ def show_help():
     """Display available commands and controls."""
     help_text = """
 [bold cyan]General Commands:[/bold cyan]
-  /help                    Show this help message
-  @<file_or_dir>           Mention a file or directory within your prompt to add it to context.
-  /file <path>             Add a file to context
-  /clear                   Clear conversation history
-  /refresh                 Refresh repository context
-  /index                   Manually re-index the entire repository.
-  /repo                    Show local repository statistics and status
-  /model                   Show/switch AI model
-  /apply                   Apply all code changes from the last AI response
-  /new <filename>          Create a new empty file
-  /save <filename>         Save the last AI code response to a specific file
+  @<file_or_dir>           [dim]Mention a file or directory within your prompt to add it to context.[/dim]
+  /help                    [dim]Show this help message[/dim]
+  /file <path>             [dim]Add a file to context[/dim]
+  /clear                   [dim]Clear conversation history[/dim]
+  /refresh                 [dim]Refresh repository context[/dim]
+  /index                   [dim]Manually re-index the entire repository[/dim]
+  /repo                    [dim]Show local repository statistics and status[/dim]
+  /model                   [dim]Show/switch AI model[/dim]
+  /apply                   [dim]Apply all code changes from the last AI response[/dim]
+  /new <filename>          [dim]Create a new empty file[/dim]
+  /save <filename>         [dim]Save the last AI code response to a specific file[/dim]
 
 [bold cyan]Local Git Commands:[/bold cyan]
-  /git_add <files...>      Stage one or more files for commit
-  /git_commit <message>    Commit staged changes with a message
-  /git_switch <branch>     Switch to a different local branch
-  /git_log                 Show recent commit history
-  /git_pull                Pull latest changes for the current branch
-  /git_push                Push committed changes to the remote repository
+  /git_add <files...>      [dim]Stage one or more files for commit[/dim]
+  /git_commit <message>    [dim]Commit staged changes with a message[/dim]
+  /git_switch <branch>     [dim]Switch to a different local branch[/dim]
+  /git_log                 [dim]Show recent commit history[/dim]
+  /git_pull                [dim]Pull latest changes for the current branch[/dim]
+  /git_push                [dim]Push committed changes to the remote repository[/dim]
   
 [bold cyan]GitHub Workflow Commands:[/bold cyan]
-  /review [-d]             Review changes, commit, push, and create a PR.
-  /create_repo             Interactively create a new GitHub repository
-  /create_branch           Interactively create a new local branch
-  /create_issue            Interactively create a new GitHub Issue
-  /issue_list [--filter <user|none|all>]  List open issues.
-                           (Default: shows all assigned issues).
-                           <user>: issues for a specific user.
-                           'none': unassigned issues.
-                           'all': all issues, assigned or not.
-  /issue_comment <#> <text> Add a comment to an issue.
-  /issue_assign <#> <user> Assign an issue to a user.
-  /issue_close <#> [text]  Close an issue, optionally with a comment.
-  /create_pr               Interactively create a new Pull Request
-  /pr_list                 List open Pull Requests.
-  /pr_link_issue <pr#> <iss#> Link a PR to an issue.
-  /pr_request_review <pr#> <user..> Request reviews for a PR.
-  /pr_approve <#>          Approve a Pull Request.
-  /pr_comment <#>          Add a comment to a Pull Request.
-  /pr_merge <#>            Merge a Pull Request.
+  /review [-d]             [dim]Review changes, commit, push, and create a PR[/dim]
+  /create_repo             [dim]Interactively create a new GitHub repository[/dim]
+  /create_branch           [dim]Interactively create a new local branch[/dim]
+  /create_issue            [dim]Interactively create a new GitHub Issue[/dim]
+  /issue_list [--filter <user|none|all>]  [dim]List open issues
+                           (Default: shows all assigned issues)
+                           <user>: issues for a specific user
+                           'none': unassigned issues
+                           'all': all issues, assigned or not[/dim]
+  /issue_comment <#> <text> [dim]Add a comment to an issue[/dim]
+  /issue_assign <#> <user> [dim]Assign an issue to a user[/dim]
+  /issue_close <#> [text]  [dim]Close an issue, optionally with a comment[/dim]
+  /create_pr               [dim]Interactively create a new Pull Request[/dim]
+  /pr_list                 [dim]List open Pull Requests[/dim]
+  /pr_link_issue <pr#> <iss#> [dim]Link a PR to an issue[/dim]
+  /pr_request_review <pr#> <user..> [dim]Request reviews for a PR[/dim]
+  /pr_approve <#>          [dim]Approve a Pull Request[/dim]
+  /pr_comment <#>          [dim]Add a comment to a Pull Request[/dim]
+  /pr_merge <#>            [dim]Merge a Pull Request[/dim]
 
   [bold cyan]Agentic Mode:[/bold cyan]
-  /knight <goal>           Activate the autonomous agent to achieve a high-level goal.
-  /knight_hybrid <goal>    Activate the advanced hybrid agent with web search and research tools.
+  /knight <goal>           [dim]Activate the autonomous agent to achieve a high-level goal[/dim]
+  /knight_hybrid <goal>    [dim]Activate the advanced hybrid agent with web search and research tools[/dim]
 
 
  [bold cyan]Code Quality Commands:[/bold cyan]
-  /optimize <filename>     Ask the AI to optimize/refactor a specific file.
-  /scan                    Perform a high-level scan of the repository for potential improvements. 
+  /optimize <filename>     [dim]Ask the AI to optimize/refactor a specific file[/dim]
+  /scan                    [dim]Perform a high-level scan of the repository for potential improvements[/dim] 
 
 [bold cyan]AI-Powered Review Commands:[/bold cyan]
-  /repo_summary            Get an AI-generated summary of the entire repository.
-  /pr_review <#>           Get an AI-generated review of a specific Pull Request.
+  /repo_summary            [dim]Get an AI-generated summary of the entire repository[/dim]
+  /pr_review <#>           [dim]Get an AI-generated review of a specific Pull Request[/dim]
 """
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 
