@@ -111,7 +111,7 @@ class ChatHandler:
         
         try:
             async with AIService(self.config) as ai_service:
-                with Live(Spinner("point", text=" Thinking..."), console=console, refresh_per_second=10, vertical_overflow="visible") as live:
+                with Live(Spinner("point", text="Thinking"), console=console, refresh_per_second=10, vertical_overflow="visible") as live:
                     async for chunk in ai_service.stream_generate(request):
                         if self._stop_generation:
                             raise asyncio.CancelledError
