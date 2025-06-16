@@ -30,29 +30,26 @@ async def run_indexing(config: Config) -> dict:
     Scans the repository, chunks files, creates vector embeddings,
     and returns the file context.
     """
-    console.print("[bold cyan]Starting repository indexing process...[/bold cyan]")
     try:
         repo_path = Path.cwd()
         file_contents = build_repo_context(repo_path, config)
         if not file_contents:
             console.print("[yellow]No supported files found to index.[/yellow]")
             return {}
-        console.print(f"Found {len(file_contents)} files to process.")
 
-        vector_store = VectorStore(config)
-        vector_store.index_files(file_contents)
+        with console.status(f"[cyan]Indexing {len(file_contents)} files...[/cyan]", spinner="dots"):
+            vector_store = VectorStore(config)
+            vector_store.index_files(file_contents)
+            
+            # Log the successful index
+            log_data = _read_log()
+            log_data['last_indexed'] = datetime.now().isoformat()
+            _write_log(log_data)
         
-        # Log the successful index
-        log_data = _read_log()
-        log_data['last_indexed'] = datetime.now().isoformat()
-        _write_log(log_data)
-        
-        console.print("[bold green]✓ Repository indexing complete![/bold green]")
+        console.print(f"[green]✓ Indexed {len(file_contents)} files successfully[/green]")
         return file_contents
     except Exception as e:
-        console.print(f"[bold red]An error occurred during indexing: {e}[/bold red]")
-        import traceback
-        console.print(f"[dim]{traceback.format_exc()}[/dim]")
+        console.print(f"[red]✗ Indexing failed: {e}[/red]")
         return {}
 
 async def check_and_run_startup_indexing(config: Config):
@@ -65,10 +62,8 @@ async def check_and_run_startup_indexing(config: Config):
         last_indexed_date = datetime.fromisoformat(last_indexed_str).date()
         if last_indexed_date == datetime.now().date():
             needs_indexing = False
-            console.print("[dim]Repository was already indexed today. Loading existing context...[/dim]")
-            # Just load the context without re-indexing
+            console.print("[dim]Loading existing index...[/dim]")
             return build_repo_context(Path.cwd(), config)
 
     if needs_indexing:
-        console.print("[yellow]Repository not indexed today. Starting automatic indexing.[/yellow]")
         return await run_indexing(config)
