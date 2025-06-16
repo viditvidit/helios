@@ -68,7 +68,11 @@ async def interactive_pr_creation(session):
         if not await git_utils.is_git_repo(repo_path): raise NotAGitRepositoryError(path=repo_path)
         console.print("\n[bold cyan]Creating a new Pull Request...[/bold cyan]")
         
-        branch_action = await questionary.select("Which branch for the PR?", choices=["Create new branch", "Use existing branch"]).ask_async()
+        # Get current branch first
+        current_branch = await git_utils.get_current_branch(repo_path)
+        console.print(f"[dim]Currently on branch: {current_branch}[/dim]")
+        
+        branch_action = await questionary.select("Which branch for the PR?", choices=["Use current branch", "Create new branch", "Use different existing branch"]).ask_async()
         head_branch = ""
 
         if branch_action == "Create new branch":
@@ -76,13 +80,22 @@ async def interactive_pr_creation(session):
             if not new_branch_name: return console.print("[red]Branch name cannot be empty.[/red]")
             await git_utils.switch_branch(repo_path, new_branch_name, create=True)
             head_branch = new_branch_name
-        else:
+        elif branch_action == "Use current branch":
+            head_branch = current_branch
+            console.print(f"[green]✓ Using current branch '{head_branch}'.[/green]")
+        else:  # "Use different existing branch"
             local_branches = await git_utils.get_local_branches(repo_path)
-            head_branch = await questionary.select("Select branch to merge from:", choices=local_branches).ask_async()
-            if head_branch != await git_utils.get_current_branch(repo_path):
+            # Remove current branch from choices since user wants a different one
+            other_branches = [b for b in local_branches if b != current_branch]
+            if not other_branches:
+                console.print("[yellow]No other branches available. Using current branch.[/yellow]")
+                head_branch = current_branch
+            else:
+                head_branch = await questionary.select("Select branch to merge from:", choices=other_branches).ask_async()
                 await git_utils.switch_branch(repo_path, head_branch)
+                console.print(f"[green]✓ Switched to and using branch '{head_branch}'.[/green]")
         
-        console.print(f"[green]✓ Using branch '{head_branch}'.[/green]")
+        # Push the branch to remote
         with console.status(f"[yellow]Pushing '{head_branch}' to remote...[/yellow]"):
             await git_utils.push(repo_path, head_branch, set_upstream=True)
 
@@ -90,6 +103,12 @@ async def interactive_pr_creation(session):
         if not title: return console.print("[red]Title cannot be empty.[/red]")
         body = await questionary.text("PR Body (optional):").ask_async()
         base = await questionary.text("Base branch to merge into:", default="main").ask_async()
+        
+        # Validate that head_branch != base
+        if head_branch == base:
+            console.print(f"[red]Error: Cannot create PR from '{head_branch}' to '{base}' (same branch)[/red]")
+            console.print("[yellow]Tip: Make sure you're on a feature branch, not the main branch[/yellow]")
+            return
         
         with console.status("Creating PR..."):
             await service.create_pull_request(title, body, head_branch, base)
