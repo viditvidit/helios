@@ -24,7 +24,6 @@ class CommandHandler:
             elif cmd == 'file': await actions.add_file_to_context(self.session, args[0] if args else "")
             elif cmd == 'refresh': await actions.refresh_repo_context(self.session)
             elif cmd == 'clear': actions.clear_history(self.session)
-            elif cmd == 'files': display.list_files_in_context(self.session.current_files)
             elif cmd == 'repo': await actions.show_repository_stats(self.session)
             elif cmd == 'model': await actions.switch_model(self.session, args[0] if args else None)
             elif cmd == 'save_conversation': await actions.save_conversation(self.session, args[0] if args else "")

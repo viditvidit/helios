@@ -33,7 +33,6 @@ def show_help():
   /help                    Show this help message
   @<file_or_dir>           Mention a file or directory within your prompt to add it to context.
   /file <path>             Add a file to context
-  /files                   List files in current context
   /clear                   Clear conversation history
   /refresh                 Refresh repository context
   /index                   Manually re-index the entire repository.
@@ -86,17 +85,6 @@ def show_help():
   /pr_review <#>           Get an AI-generated review of a specific Pull Request.
 """
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
-
-def list_files_in_context(current_files: Dict[str, str]):
-    if not current_files:
-        console.print("[yellow]No files loaded in context.[/yellow]")
-        return
-    file_count = len(current_files)
-    total_lines = sum(len(content.splitlines()) for content in current_files.values())
-    files_info = [f"- {fp} ({len(content.splitlines())} lines)" for fp, content in current_files.items()]
-    panel_content = f"Total: {file_count} files, {total_lines} lines\n\n"
-    panel_content += "\n".join(files_info)
-    console.print(Panel(panel_content, title="Files in Context", border_style="blue"))
 
 def show_repo_stats(repo_context: Dict[str, str], git_context: Dict):
     from pathlib import Path

@@ -2,6 +2,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.markdown import Markdown
 import questionary
 from typing import List, Optional
 import os
@@ -127,9 +128,15 @@ async def repo_summary(session):
     """Logic to get AI summary of the repo."""
     try:
         service = GitHubService(session.config)
-        with console.status("[dim][bold yellow]Generating AI repository summary...[/bold yellow][/dim]"):
+        with console.status("[dim][bold cyan]Generating AI repository summary...[/bold cyan][/dim]"):
             summary = await service.get_ai_repo_summary()
-        console.print(Panel(summary, title="AI Repository Summary", border_style="blue", expand=True))
+        markdown_content = Markdown(summary)
+        console.print(Panel(
+            markdown_content,  
+            title=f"Helios Repository Summary",             
+            border_style="blue", 
+            expand=True
+        ))
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error: {e}[/red]")
 
@@ -140,9 +147,17 @@ async def pr_review(session, pr_number_str: str):
     pr_number = int(pr_number_str)
     try:
         service = GitHubService(session.config)
-        with console.status(f"[yellow]Generating AI review for PR #{pr_number}...[/yellow]"):
+        with console.status(f"[yellow]Generating AI review...[/yellow]"):
             summary = await service.get_ai_pr_summary(pr_number)
-        console.print(Panel(summary, title=f"AI Review for PR #{pr_number}", border_style="blue", expand=True))
+        
+        # Create Markdown object and wrap it in Panel with proper title
+        markdown_content = Markdown(summary)
+        console.print(Panel(
+            markdown_content, 
+            title=f"Helios Review for PR #{pr_number}", 
+            border_style="blue", 
+            expand=True
+        ))
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error: {e}[/red]")
 
