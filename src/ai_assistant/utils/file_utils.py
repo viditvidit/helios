@@ -67,5 +67,3 @@ class FileUtils:
             '.md': 'markdown', '.txt': 'text', '.sh': 'bash'
         }
         return lang_map.get(ext.lower(), 'text')
-
-    # Other methods from the original file can be kept here if needed

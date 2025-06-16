@@ -127,7 +127,7 @@ async def repo_summary(session):
     """Logic to get AI summary of the repo."""
     try:
         service = GitHubService(session.config)
-        with console.status("[bold yellow]Generating AI repository summary...[/bold yellow]"):
+        with console.status("[dim][bold yellow]Generating AI repository summary...[/bold yellow][/dim]"):
             summary = await service.get_ai_repo_summary()
         console.print(Panel(summary, title="AI Repository Summary", border_style="blue", expand=True))
     except (GitHubServiceError, NotAGitRepositoryError) as e:

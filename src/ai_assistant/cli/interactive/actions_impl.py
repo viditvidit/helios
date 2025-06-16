@@ -52,7 +52,7 @@ async def handle_git_commit(session, message: str):
     await git_logic.commit(message)
     
 async def handle_git_switch(session, branch: str):
-    await git_logic.switch(branch)
+    await git_logic.switch(branch if branch else None)
     
 async def handle_git_pull(session):
     await git_logic.pull()

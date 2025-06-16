@@ -1,10 +1,16 @@
-# src/ai_assistant/logic/agent_tools_hybrid.py
-
 import asyncio
 import os
+import json
+try:
+    import json5  # For lenient JSON parsing (allows trailing commas, comments, etc.)
+except ImportError:
+    json5 = None
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TaskProgressColumn
 from rich.text import Text
+from typing import List, Dict, Any
+import re
+import shutil
 
 from . import file_logic, code_logic
 from ..services.ai_service import AIService
@@ -31,7 +37,9 @@ async def generate_code_for_file(session, filename: str, prompt: str) -> bool:
         "**CRITICAL INSTRUCTIONS:**\n"
         "- DO NOT include any explanations, introductory text, or summaries.\n"
         "- DO NOT wrap the code in markdown code blocks like ```python.\n"
-        "- DO NOT include the command to run the file.\n\n"
+        "- DO NOT include the command to run the file.\n"
+        "- For JSON files, ensure the output is VALID JSON with proper syntax.\n"
+        "- For package.json files, include all required fields and valid structure.\n\n"
         f"**File to create:** `{filename}`\n"
         f"**Code to generate based on this prompt:** {prompt}"
     )
@@ -45,13 +53,59 @@ async def generate_code_for_file(session, filename: str, prompt: str) -> bool:
     if not generated_code:
         return False
     
-    # The cleanup logic is still good as a fallback
-    generated_code = generated_code.strip().removeprefix("```").removesuffix("```").strip()
+    # Enhanced cleanup logic
+    generated_code = generated_code.strip()
+    
+    # Remove markdown code blocks if present
+    if generated_code.startswith("```"):
+        lines = generated_code.split('\n')
+        if len(lines) > 1:
+            # Remove first line (```language)
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            # Remove last line (```)
+            lines = lines[:-1]
+        generated_code = '\n'.join(lines)
+    
+    # Validate JSON files before saving
+    if filename.endswith('.json'):
+        try:
+            json.loads(generated_code)
+            console.print(f"[green]✓ Generated valid JSON for {filename}[/green]")
+        except json.JSONDecodeError as e:
+            console.print(f"[yellow]⚠ Generated invalid JSON for {filename}, attempting to fix...[/yellow]")
+            # Try to fix common JSON issues
+            generated_code = fix_json_content(generated_code)
+            try:
+                json.loads(generated_code)
+                console.print(f"[green]✓ Fixed JSON for {filename}[/green]")
+            except json.JSONDecodeError:
+                console.print(f"[red]✗ Could not fix JSON for {filename}[/red]")
+                return False
+    
     session.last_ai_response_content = f"```{filename}\n{generated_code}\n```"
-    await file_logic.save_code(session, filename)
-    return True
+    return await file_logic.save_code(session, filename)
 
-async def generate_code_concurrently(session, files: list) -> bool:
+def fix_json_content(content: str) -> str:
+    """
+    Attempts to fix common JSON formatting issues.
+    """
+    # Remove any leading/trailing whitespace
+    content = content.strip()
+    
+    # Remove trailing commas (common AI mistake)
+    content = re.sub(r',\s*}', '}', content)
+    content = re.sub(r',\s*]', ']', content)
+    
+    # Fix common quote issues
+    content = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', content)
+    
+    # Ensure proper string quoting
+    content = re.sub(r':\s*([^"\[\{][^,\}\]]*[^,\}\]\s])\s*([,\}\]])', r': "\1"\2', content)
+    
+    return content
+
+async def generate_code_concurrently(session, files: List[Dict[str, Any]]) -> bool:
     """
     Generates code for multiple files concurrently using a robust runner pattern.
     """
@@ -65,7 +119,7 @@ async def generate_code_concurrently(session, files: list) -> bool:
 
     # Define a local "runner" coroutine that wraps the main task
     # and handles its own progress bar updates.
-    async def _runner(base_coro, progress_id, filename):
+    async def _runner(base_coro, progress_id, filename: str) -> bool:
         try:
             # Await the actual code generation
             success = await base_coro
@@ -92,7 +146,7 @@ async def generate_code_concurrently(session, files: list) -> bool:
             
             # Create the progress bar for this task
             progress_id = progress.add_task(f"Writing {filename}...", total=1)
-                        # Create the runner task that will manage the base task and its progress bar
+            # Create the runner task that will manage the base task and its progress bar
             runner_task = _runner(base_task_coro, progress_id, filename)
             runner_tasks.append(runner_task)
 
@@ -110,9 +164,7 @@ async def web_search(query: str, num_results: int = 5) -> str:
     try:
         # googlesearch is synchronous, so we run it in a thread to not block asyncio
         search_results = await asyncio.to_thread(google_search, query, num_results=num_results, stop=num_results, pause=1)
-        formatted_results = []
-        for i, result in enumerate(search_results):
-            formatted_results.append(f"{i+1}. {result}")
+        formatted_results = [f"{i+1}. {result}" for i, result in enumerate(search_results)]
         return "\n".join(formatted_results) if formatted_results else "No results found."
     except Exception as e:
         return f"Error during web search: {e}"
@@ -160,6 +212,66 @@ async def list_files_recursive(session, path: str = '.') -> str:
         return "\n".join(tree)
     except Exception as e:
         return f"Error listing files: {e}"
+
+async def validate_and_fix_json_files(session, directory: str = '.', project_only: bool = False) -> bool:
+    """
+    Validates and attempts to fix JSON files in the specified directory.
+    If project_only is True, excludes node_modules and other common dependency directories.
+    """
+    work_dir = session.config.work_dir / directory
+    console.print(f"Validating JSON files in: [italic]{work_dir}[/italic]...")
+    
+    if project_only:
+        # Only check project-level JSON files, exclude dependencies
+        json_files = []
+        exclude_dirs = {'node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.nyc_output', 'vendor', '__pycache__'}
+        
+        for json_file in work_dir.rglob("*.json"):
+            # Check if any part of the path contains excluded directories
+            if not any(part in exclude_dirs for part in json_file.parts):
+                json_files.append(json_file)
+    else:
+        json_files = list(work_dir.glob("**/*.json"))
+    
+    if not json_files:
+        console.print("[yellow]No JSON files found.[/yellow]")
+        return True
+    
+    console.print(f"[dim]Found {len(json_files)} JSON files to validate...[/dim]")
+    
+    all_valid = True
+    for json_file in json_files:
+        try:
+            with json_file.open("r", encoding="utf-8") as f:
+                content = f.read()
+            
+            # Try to parse as JSON
+            try:
+                data = json.loads(content)
+                # Only print validation success for project files, not dependencies
+                if project_only or len(json_files) < 20:  # Only show details for small sets
+                    console.print(f"[green]✓ {json_file.name} is valid JSON[/green]")
+            except json.JSONDecodeError as e:
+                console.print(f"[yellow]⚠ {json_file.name} has JSON errors, attempting to fix...[/yellow]")
+                
+                # Attempt to fix the JSON
+                fixed_content = fix_json_content(content)
+                
+                try:
+                    data = json.loads(fixed_content)
+                    # Write the fixed content back
+                    with json_file.open("w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    console.print(f"[green]✓ Fixed and saved {json_file.name}[/green]")
+                except json.JSONDecodeError:
+                    console.print(f"[red]✗ Could not fix {json_file.name}: {e}[/red]")
+                    all_valid = False
+                    
+        except Exception as e:
+            console.print(f"[red]✗ Error processing {json_file.name}: {e}[/red]")
+            all_valid = False
+    
+    return all_valid
 
 # --- FIXED GIT PUSH TOOL ---
 async def git_initial_push(session, remote_name: str = "origin", branch: str = "main") -> bool:
@@ -221,13 +333,7 @@ async def github_create_repo_non_interactive(session, repo_name: str, descriptio
         console.print(f"[red]Error ensuring GitHub repo exists: {e}[/red]")
         return False
 
-async def run_shell_command(session, command: str, cwd: str = None, can_fail: bool = False, verbose: bool = False, force_overwrite: bool = False, background: bool = False, allow_dependency_conflicts: bool = False) -> bool:
-    """
-    Runs a shell command. If verbose=False, it will hide stdout/stderr unless the command fails.
-    Automatically handles common "safe failures" like mkdir on existing directories.
-    Set background=True for long-running processes like servers.
-    Set allow_dependency_conflicts=True for npm/yarn to use legacy peer dependency resolution.
-    """
+async def run_shell_command(session, command: str, cwd: str = None, can_fail: bool = False, verbose: bool = False, force_overwrite: bool = False, background: bool = False, allow_dependency_conflicts: bool = False, pre_validate_json: bool = True) -> bool:
     work_dir = session.config.work_dir
     run_dir = work_dir / cwd if cwd else work_dir
 
@@ -239,31 +345,29 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
             console.print(f"[red]✗ Failed to create working directory '{run_dir}': {e}[/red]")
             return False
 
+    # FIXED: Only validate JSON for package management commands, and only project files
+    should_validate_json = (pre_validate_json and 
+                           any(cmd in command.lower() for cmd in ['npm install', 'npm i ', 'yarn install', 'yarn add']))
+    
+    if should_validate_json:
+        console.print("[dim]Pre-validating project JSON files before package installation...[/dim]")
+        await validate_and_fix_json_files(session, cwd or '.', project_only=True)
+
+    # REMOVED: Universal JSON auto-formatting - this was causing the repeated validation
+    
     effective_command = command
-    # --- FIX: Intelligently handle dependency conflicts for different package managers ---
     if allow_dependency_conflicts:
         cmd_lower = command.strip().lower()
         if cmd_lower.startswith("npm install") or cmd_lower.startswith("npm i "):
-            console.print("[yellow]Peer dependency conflicts allowed. Appending '--legacy-peer-deps' for npm.[/yellow]")
+            console.print("[yellow]Dependency conflicts allowed. Appending '--legacy-peer-deps' for npm.[/yellow]")
             effective_command += " --legacy-peer-deps"
-        # Add similar logic for other package managers if needed in the future
-        # elif cmd_lower.startswith("yarn add"):
-        #     effective_command += " --ignore-engines" # Example for yarn
-
-    if command.strip().startswith("source"):
-        parts = command.split("&&")
-        if parts:
-            activation_command = parts[0].strip()
-            tokens = activation_command.split()
-            if len(tokens) >= 2:
-                activation_script = run_dir / tokens[1]
-                if not activation_script.exists():
-                    console.print(f"[red]✗ Virtual environment activation script not found at {activation_script}. Please create the virtual environment first.[/red]")
-                    return False
+        elif cmd_lower.startswith("yarn install") or cmd_lower.startswith("yarn add"):
+            console.print("[yellow]Dependency conflicts allowed. Appending '--legacy-peer-deps' for yarn.[/yellow]")
+            effective_command += " --legacy-peer-deps"
 
     console.print(f"Running command: [bold magenta]{effective_command}[/bold magenta] in [dim]{run_dir}[/dim]")
 
-    server_keywords = ['uvicorn', 'npm start', 'yarn start', 'flask run', 'python -m http.server', 'serve', '--watch', '--reload']
+    server_keywords = ['uvicorn', 'npm start', 'yarn start', 'flask run', 'python -m http.server', 'serve', '--watch', '--reload', 'next dev', 'vite', 'webpack-dev-server']
     if not background and any(keyword in command.lower() for keyword in server_keywords):
         console.print(f"[yellow]Detected server command. Running in background mode.[/yellow]")
         background = True
@@ -275,7 +379,6 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
             target_path = run_dir / target_dir
             if target_path.exists():
                 console.print(f"[yellow]Force overwrite enabled. Removing existing directory: {target_path}[/yellow]")
-                import shutil
                 shutil.rmtree(target_path)
 
     try:
@@ -289,20 +392,19 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
             try:
                 await asyncio.wait_for(process.wait(), timeout=3.0)
                 stdout, stderr = await process.communicate()
-                stderr_text = stderr.decode().strip() if stderr else ""
-                stdout_text = stdout.decode().strip() if stdout else ""
                 if process.returncode != 0:
                     console.print("[bold red]Server command failed to start. Output:[/bold red]")
-                    if stdout_text: console.print(Text("[stdout] ", style="dim") + Text(stdout_text))
-                    if stderr_text: console.print(Text("[stderr] ", style="dim") + Text(stderr_text))
+                    if stdout:
+                        console.print(Text("[stdout] ", style="dim") + Text(stdout.decode().strip()))
+                    if stderr:
+                        console.print(Text("[stderr] ", style="dim") + Text(stderr.decode().strip()))
                     return False
                 else:
                     console.print(f"[green]✓ Background command completed successfully.[/green]")
                     return True
             except asyncio.TimeoutError:
                 console.print(f"[green]✓ Server started successfully and running in background (PID: {process.pid}).[/green]")
-                if not hasattr(session, 'background_processes'):
-                    session.background_processes = []
+                session.background_processes = getattr(session, 'background_processes', [])
                 session.background_processes.append(process)
                 return True
         else:
@@ -322,28 +424,48 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
                 console.print(f"[green]✓ Shell command finished successfully.[/green]")
                 return True
             else:
-                stderr_text = stderr.decode().strip() if stderr else ""
                 stdout_text = stdout.decode().strip() if stdout else ""
+                stderr_text = stderr.decode().strip() if stderr else ""
+                
+                # Enhanced error handling for common cases
                 if command.strip().startswith('mkdir') and 'File exists' in stderr_text:
                     console.print(f"[yellow]✓ Directory already exists. Continuing.[/yellow]")
                     return True
+                    
                 if "create-react-app" in command and "contains files that could conflict" in stdout_text:
                     console.print(f"[yellow]✓ Directory contains conflicting files, but this is expected in development. Continuing.[/yellow]")
                     return True
+                    
                 if 'command not found' in stderr_text or ': command not found' in stderr_text:
                     missing_cmd = command.split()[0]
                     console.print(f"[yellow]⚠ Command '{missing_cmd}' not found.[/yellow]")
                     console.print(f"[dim]Consider installing it first, then retry this step.[/dim]")
                     console.print(f"[yellow]✓ Treating missing command as non-critical. Continuing.[/yellow]")
                     return True
+                    
                 if ('already exists' in stderr_text.lower() or 
                     'already up to date' in stderr_text.lower() or
                     'already up-to-date' in stdout_text.lower()):
                     console.print(f"[yellow]✓ Resource already exists or is up to date. Continuing.[/yellow]")
                     return True
+                
+                # FIXED: Only attempt JSON fix for actual JSON errors, and only if we haven't already validated
+                if (not should_validate_json and 
+                    ('ejsonparse' in stderr_text.lower() or 'json.parse' in stderr_text.lower())):
+                    console.print(f"[red]✗ JSON parsing error detected. Attempting to fix project JSON files...[/red]")
+                    if await validate_and_fix_json_files(session, cwd or '.', project_only=True):
+                        console.print(f"[yellow]✓ JSON files fixed. Retrying command...[/yellow]")
+                        # Retry the command once after fixing JSON
+                        return await run_shell_command(session, command, cwd, can_fail, verbose, force_overwrite, background, allow_dependency_conflicts, pre_validate_json=False)
+                    else:
+                        console.print(f"[red]✗ Could not fix JSON files.[/red]")
+                
                 console.print("[bold red]Shell command failed. Output:[/bold red]")
-                if stdout_text: console.print(Text("[stdout] ", style="dim") + Text(stdout_text))
-                if stderr_text: console.print(Text("[stderr] ", style="dim") + Text(stderr_text))
+                if stdout_text:
+                    console.print(Text("[stdout] ", style="dim") + Text(stdout_text))
+                if stderr_text:
+                    console.print(Text("[stderr] ", style="dim") + Text(stderr_text))
+                    
                 if can_fail:
                     console.print(f"[yellow]! Command failed but was marked as non-critical. Continuing.[/yellow]")
                     return True
@@ -354,15 +476,18 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
         console.print(f"[red]✗ An unexpected error occurred while running shell command: {e}[/red]")
         return False
 
-# --- MORE ROBUST GIT/GITHUB SETUP ---
 async def setup_git_and_push(session, commit_message: str, repo_name: str, branch: str = "main") -> bool:
     """
     A high-level tool that performs the entire initial Git setup and push sequence.
-    This tool is now fully idempotent.
+    This tool is now fully idempotent with better conflict resolution.
     """
     console.print(f"Starting full Git and GitHub setup for [italic]{repo_name}[/italic]...")
     git_utils = git_logic.GitUtils()
     work_dir = session.config.work_dir
+
+    # FIXED: Pre-validate only project JSON files before git operations
+    console.print("[dim]Pre-validating project JSON files before Git operations...[/dim]")
+    await validate_and_fix_json_files(session, '.', project_only=True)
 
     # 0. Initialize git repo if it doesn't exist
     if not await git_utils.is_git_repo(work_dir):
@@ -397,8 +522,6 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
             if "nothing to commit" not in str(commit_error).lower():
                  console.print(f"[yellow]Commit failed: {commit_error}. Continuing...[/yellow]")
 
-
-    # --- CORRECTED LOGIC ---
     # 3. Ensure the GitHub repo exists AND get its URL
     console.print(f"[dim]Ensuring GitHub repository '{repo_name}' exists...[/dim]")
     if not await github_create_repo_non_interactive(session, repo_name):
@@ -434,29 +557,50 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
     except Exception as e:
         console.print(f"[yellow]Warning: Could not rename branch: {e}[/yellow]")
 
-    # 6. Pull from remote to reconcile histories (e.g., the initial README)
+    # FIXED: Better handling of divergent branches and push conflicts
+    # 6. Configure git to handle divergent branches with merge strategy
+    try:
+        await git_utils._run_git_command(work_dir, ['config', 'pull.rebase', 'false'])
+        console.print("[dim]Configured git to use merge strategy for divergent branches.[/dim]")
+    except Exception:
+        pass  # Not critical if this fails
+    
+    # 7. Pull from remote to reconcile histories (e.g., the initial README)
     try:
         console.print(f"[dim]Pulling from origin to reconcile histories...[/dim]")
-        # This command is very robust. It allows unrelated histories and auto-resolves
-        # conflicts by preferring the remote's version (e.g., the README).
-        await git_utils._run_git_command(work_dir, ['pull', 'origin', branch, '--allow-unrelated-histories'])
-        console.print("[green]✓ Histories reconciled.[/green]")
+        await git_utils._run_git_command(work_dir, ['pull', 'origin', branch, '--allow-unrelated-histories', '--no-edit', '--strategy-option=ours'])
+        console.print("[green]✓ Histories reconciled using merge strategy.[/green]")
     except Exception as e:
         if "couldn't find remote ref" in str(e).lower():
              console.print(f"[dim]Remote branch '{branch}' doesn't exist yet. Skipping pull.[/dim]")
         else:
-             console.print(f"[yellow]Warning: Pull failed: {e}. Attempting to push anyway...[/yellow]")
+             console.print(f"[yellow]Warning: Pull failed: {e}. Attempting force push...[/yellow]")
+             # If pull fails due to conflicts, we'll try a force push instead
+             try:
+                 console.print(f"[dim]Force pushing branch '{branch}' to origin...[/dim]")
+                 await git_utils._run_git_command(work_dir, ['push', '--force-with-lease', 'origin', branch])
+                 console.print(f"[green]✓ Force pushed project to GitHub![/green]")
+                 return True
+             except Exception as force_push_error:
+                 console.print(f"[red]Force push also failed: {force_push_error}[/red]")
+                 return False
 
-    # 7. Push the final, reconciled state to the remote
+    # 8. Push the final, reconciled state to the remote
     try:
         console.print(f"[dim]Pushing branch '{branch}' to origin...[/dim]")
         await git_utils.push(work_dir, branch, set_upstream=True)
         console.print(f"[green]✓ Successfully pushed project to GitHub![/green]")
         return True
     except Exception as e:
-        console.print(f"[red]Push failed: {e}[/red]")
-        console.print(f"[yellow]The repository and commits are ready. You may need to push manually.[/yellow]")
-        return False # The final, most important step failed.
+        console.print(f"[yellow]Normal push failed: {e}. Attempting force push with lease...[/yellow]")
+        try:
+            await git_utils._run_git_command(work_dir, ['push', '--force-with-lease', '--set-upstream', 'origin', branch])
+            console.print(f"[green]✓ Successfully force pushed project to GitHub![/green]")
+            return True
+        except Exception as force_error:
+            console.print(f"[red]All push attempts failed: {force_error}[/red]")
+            console.print(f"[yellow]The repository and commits are ready. You may need to push manually.[/yellow]")
+            return False
 
 # The central registry of all tools available to the Knight Agent
 

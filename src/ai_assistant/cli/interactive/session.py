@@ -87,7 +87,6 @@ class InteractiveSession:
             raise KeyboardInterrupt
 
     async def _setup_working_directory(self):
-        # ... (This method is unchanged)
         helios_dir = Path.cwd() / ".helios"
         if helios_dir.exists():
             console.print(f"[dim]Using existing project root: {Path.cwd()}[/dim]")

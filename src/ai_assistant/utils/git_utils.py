@@ -1,3 +1,5 @@
+# src/ai_assistant/utils/git_utils.py
+
 import asyncio
 import subprocess
 from pathlib import Path
@@ -45,20 +47,65 @@ class GitUtils:
 
     async def get_local_branches(self, repo_path: Path) -> List[str]:
         """Get a list of local branch names."""
+        # --- FIX: Fetch first to ensure the list is up to date ---
+        try:
+            await self._run_git_command(repo_path, ['fetch', 'origin'])
+        except Exception:
+            pass # Continue even if fetch fails
         result = await self._run_git_command(repo_path, ['branch', '--list'])
         return [b.replace('*', '').strip() for b in result.splitlines()]
 
-    async def switch_branch(self, repo_path: Path, branch_name: str, create: bool = False) -> bool:
-        """Switches to an existing branch or creates a new one."""
-        command = ['switch']
-        if create:
-            command.append('-c')
-        command.append(branch_name)
+    async def get_all_branches(self, repo_path: Path) -> List[str]:
+        """Get a list of all remote branch names."""
         try:
-            await self._run_git_command(repo_path, command)
+            await self._run_git_command(repo_path, ['fetch', 'origin'])
+        except Exception:
+            pass
+
+        result = await self._run_git_command(repo_path, ['branch', '-r'])
+        branches = []
+        for line in result.splitlines():
+            branch = line.strip()
+            if branch.startswith('origin/') and 'HEAD ->' not in branch:
+                branch_name = branch.replace('origin/', '')
+                branches.append(branch_name)
+        return branches
+
+    async def switch_branch(self, repo_path: Path, branch_name: str, create: bool = False) -> bool:
+        """Switches to an existing local or remote branch, or creates a new one."""
+        
+        # --- THE CORE FIX ---
+        # 1. Always fetch the latest from the remote to know about all branches.
+        try:
+            await self._run_git_command(repo_path, ['fetch', 'origin'])
+        except Exception:
+            pass  # Not fatal, a local branch switch might still work.
+
+        # 2. If creating a new branch, just do it and exit.
+        if create:
+            try:
+                await self._run_git_command(repo_path, ['switch', '-c', branch_name])
+                return True
+            except Exception:
+                return False
+
+        # 3. Try to switch directly. This works for existing local branches
+        #    and for remote branches if tracking is already set up.
+        try:
+            await self._run_git_command(repo_path, ['switch', branch_name])
             return True
         except Exception:
-            return False
+            # This is expected to fail if the local branch doesn't exist yet.
+            pass
+            
+        # 4. If direct switch fails, it's likely a remote branch that needs a
+        #    local tracking branch created. This is the common case.
+        try:
+            await self._run_git_command(repo_path, ['switch', '--track', f'origin/{branch_name}'])
+            return True
+        except Exception:
+            return False # If all attempts fail, return False.
+
 
     async def pull(self, repo_path: Path) -> bool:
         """Pulls latest changes for the current branch."""
@@ -79,27 +126,7 @@ class GitUtils:
     async def get_branches(self, repo_path: Path) -> str:
         """Get all local and remote branches."""
         return await self._run_git_command(repo_path, ['branch', '-a'])
-    '''
-    async def _run_git_command(self, repo_path: Path, command: List[str]) -> str:
-        """Runs a git command asynchronously using the safer exec method."""
-        try:
-            process = await asyncio.create_subprocess_exec(
-                'git', *command,
-                cwd=repo_path,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            stdout, stderr = await process.communicate()
-            if process.returncode != 0 and not (command[0] == 'commit' and b'nothing to commit' in stdout):
-                raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
-            return stdout.decode('utf-8').strip()
-        except FileNotFoundError:
-            raise Exception("Git not found. Please install Git.")
-        except subprocess.CalledProcessError as e:
-            raise Exception(f"Git command failed: {e.stderr.decode('utf-8').strip()}")
-        except Exception as e:
-            raise Exception(f"An unexpected error occurred with git: {e}")
-    '''
+
     async def get_current_branch(self, repo_path: Path) -> str:
         """Get current git branch"""
         return await self._run_git_command(repo_path, ['branch', '--show-current'])
@@ -108,14 +135,6 @@ class GitUtils:
         """Returns recent commits as a single string."""
         return await self._run_git_command(repo_path, ['log', f'-{count}', '--oneline'])
     
-    async def add_file(self, repo_path: Path, file_path: str) -> bool:
-        """Add a single file to git staging."""
-        try:
-            await self._run_git_command(repo_path, ['add', file_path])
-            return True
-        except Exception:
-            return False
-        
     async def add_files(self, repo_path: Path, file_paths: List[str]) -> bool:
         """Add multiple files to git staging."""
         try:
@@ -123,16 +142,7 @@ class GitUtils:
             return True
         except Exception:
             return False
-    '''
-    async def commit(self, repo_path: Path, message: str) -> bool:
-        """Commit changes"""
-        try:
-            await self._run_git_command(repo_path, ['commit', '-m', message])
-            return "nothing to commit" not in await self.get_status(repo_path)
-        except Exception as e:
-            if "nothing to commit" in str(e): return False
-            raise e
-    '''
+
     async def push(self, repo_path: Path, branch: str, set_upstream: bool = False) -> bool:
         """Push changes to remote."""
         command = ['push', 'origin', branch]
@@ -146,7 +156,6 @@ class GitUtils:
         
     async def get_formatted_log(self, repo_path: Path, count: int = 15) -> str:
         """Gets a nicely formatted git log."""
-        # The format string shows: commit hash (short), relative time, author, and subject
         format_str = "%C(yellow)%h%C(reset) %C(green)(%cr)%C(reset) %C(bold blue)<%an>%C(reset) %s"
         return await self._run_git_command(repo_path, ['log', f'--pretty=format:{format_str}', f'-n{count}'])
     
@@ -161,13 +170,12 @@ class GitUtils:
             )
             stdout, stderr = await process.communicate()
             
-            # --- THE FIX: Handle non-fatal exit codes gracefully ---
             stdout_str = stdout.decode('utf-8').strip()
-            stderr_str = stderr.decode('utf-8').strip()
 
-            # The `commit` command can exit with 1 if there's nothing to commit. This is not an error.
-            if process.returncode != 0 and "nothing to commit" not in stdout_str:
-                 raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
+            if process.returncode != 0:
+                # Allow 'nothing to commit' to pass without error
+                if "nothing to commit" not in stdout_str and "nothing to commit" not in stderr.decode('utf-8'):
+                    raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
 
             return stdout_str
         except FileNotFoundError:
@@ -180,14 +188,12 @@ class GitUtils:
     async def commit(self, repo_path: Path, message: str) -> bool:
         """Commit changes. Returns True if a commit was made, False otherwise."""
         try:
-            # This call will now not raise an exception for "nothing to commit"
             result = await self._run_git_command(repo_path, ['commit', '-m', message])
             
-            # Check if the output indicates that no commit was made
             if "nothing to commit" in result or "no changes added to commit" in result:
-                return False # No new commit was created
-            return True # A commit was successfully created
+                return False
+            return True
         except Exception as e:
-            # Re-raise any other critical exceptions
+            if "nothing to commit" in str(e).lower():
+                return False
             raise e
-
