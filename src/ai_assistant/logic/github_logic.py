@@ -88,7 +88,7 @@ async def interactive_pr_creation(session):
         head_branch = ""
 
         if branch_action == "Create new branch":
-            new_branch_name = await questionary.text("Enter name for the new local feature branch:").ask_async()
+            new_branch_name = await questionary.text("Enter name for the new feature branch:").ask_async()
             if not new_branch_name: return console.print("[red]Branch name cannot be empty.[/red]")
             await git_utils.switch_branch(repo_path, new_branch_name, create=True)
             head_branch = new_branch_name
@@ -98,7 +98,6 @@ async def interactive_pr_creation(session):
             console.print(f"[green]✓ Using current branch '{head_branch}' as PR source.[/green]")
         else:  # "Switch to different branch"
             local_branches = await git_utils.get_local_branches(repo_path)
-            # Remove current branch from choices since user wants a different one
             other_branches = [b for b in local_branches if b != current_branch]
             if not other_branches:
                 console.print("[yellow]No other branches available. Using current branch.[/yellow]")
@@ -115,7 +114,7 @@ async def interactive_pr_creation(session):
         title = await questionary.text("PR Title:").ask_async()
         if not title: return console.print("[red]Title cannot be empty.[/red]")
         body = await questionary.text("PR Body (optional):").ask_async()
-        base = await questionary.text("Base branch to merge INTO:", default="main").ask_async()
+        base = await questionary.text("Target branch:", default="main").ask_async()
         
         # Validate that head_branch != base
         if head_branch == base:
@@ -124,7 +123,7 @@ async def interactive_pr_creation(session):
             return
         
         console.print(f"[cyan]Creating PR: {head_branch} → {base}[/cyan]")
-        with console.status("Creating PR..."):
+        with console.status("Creating Pull Request..."):
             await service.create_pull_request(title, body, head_branch, base)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error creating PR: {e}[/red]")
