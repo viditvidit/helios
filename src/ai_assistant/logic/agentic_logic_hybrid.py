@@ -177,10 +177,10 @@ class KnightAgentHybrid:
             if not is_valid:
                 console.print(f"[bold red]Error: The AI generated an invalid plan.[/bold red]")
                 console.print(f"[red]Reason: {error_message}[/red]")
-                json_syntax = Syntax(json.dumps(plan, indent=2), "json", theme="monokai")
+                json_syntax = Syntax(json.dumps(plan, indent=2), "json", theme="github-dark")
                 console.print(Panel(json_syntax, title="[red]Invalid Plan Details[/red]", border_style="red"))
                 return []
-            json_syntax = Syntax(json.dumps(plan, indent=2), "json", theme="monokai", line_numbers=True)
+            json_syntax = Syntax(json.dumps(plan, indent=2), "json", theme="github-dark", line_numbers=True)
             console.print(Panel(json_syntax, title=f"[bold {Theme.PLAN_TITLE}]Execution Plan[/bold {Theme.PLAN_TITLE}]", border_style=Theme.PLAN_TITLE))
             return plan
         except json.JSONDecodeError:

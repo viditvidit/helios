@@ -13,3 +13,5 @@ ai_assistant.log
 session-statbar.py
 agent_tests/
 test.py
+system_rules.md
+dir_Struc.md

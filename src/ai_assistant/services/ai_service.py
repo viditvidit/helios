@@ -71,7 +71,7 @@ class AIService:
         return messages
 
     async def stream_generate(self, request: CodeRequest) -> AsyncGenerator[str, None]:
-        """Streams a response, formatting 'thinking' steps as dim text."""
+        """Streams a response, removing content within <Thinking>...</Thinking> tags."""
         if self.model_config.type != 'ollama':
             raise AIServiceError(f"Unsupported streaming model type: {self.model_config.type}")
 
@@ -90,6 +90,11 @@ class AIService:
             }
         }
         url = f"{self.model_config.endpoint}/api/chat"
+        
+        buffer = ""
+        in_thought_block = False
+        start_tag = "<Thinking>"
+        end_tag = "</Thinking>"
 
         try:
             async with self.session.post(url, json=payload) as response:
@@ -102,17 +107,52 @@ class AIService:
                     try:
                         data = json.loads(line.decode('utf-8'))
                         if 'message' in data and 'content' in data['message']:
-                            content = data['message']['content']
-                            # Check for "thinking" markers. You can customize these markers.
-                            # If your system_prompt asks the AI to start thoughts with "Thinking:", this will work.
-                            if content.strip().startswith("Thinking:"):
-                                yield str(Text(content, style="dim"))
-                            else:
-                                yield content
+                            chunk = data['message']['content']
+                            buffer += chunk
+                            
+                            # Process the buffer as long as there's something to do
+                            while True:
+                                scan_again = False
+                                if in_thought_block:
+                                    end_pos = buffer.find(end_tag)
+                                    if end_pos != -1:
+                                        # End of thought block found. Discard content up to tag.
+                                        buffer = buffer[end_pos + len(end_tag):]
+                                        in_thought_block = False
+                                        scan_again = True # There might be another tag in the remaining buffer
+                                    else:
+                                        # Still inside a thought block, need more data.
+                                        # Discard the current buffer as it's all thought content.
+                                        buffer = ""
+                                else: # Not in a thought block
+                                    start_pos = buffer.find(start_tag)
+                                    if start_pos != -1:
+                                        # Start of a thought block found.
+                                        # Yield the content before the tag.
+                                        if start_pos > 0:
+                                            yield buffer[:start_pos]
+                                        # Keep the content after the tag for the next scan.
+                                        buffer = buffer[start_pos + len(start_tag):]
+                                        in_thought_block = True
+                                        scan_again = True # The rest of the buffer needs scanning.
+                                    else:
+                                        # No tags found, yield the whole buffer and clear it.
+                                        if buffer:
+                                            yield buffer
+                                        buffer = ""
+                                
+                                if not scan_again:
+                                    break # Nothing more to process in the buffer for now
+
                         if data.get('done'):
                             break
-                    except json.JSONDecodeError:
-                        continue # Ignore malformed JSON lines
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        continue
+                
+                # After the loop, yield any remaining buffer content if not in a thought block.
+                if buffer and not in_thought_block:
+                    yield buffer
+
         except asyncio.TimeoutError:
             raise AIServiceError("Request to Ollama timed out. The model may be taking too long to respond.")
         except aiohttp.ClientError as e:

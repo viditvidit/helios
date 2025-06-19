@@ -165,6 +165,9 @@ async def review_and_commit(show_diff: bool = False) -> tuple[bool, str]:
             if await questionary.confirm("Stage these files before reviewing?", default=True, auto_enter=False).ask_async():
                 await git_utils.add_files(repo_path, unstaged)
                 console.print("[green]✓ Staged all detected changes.[/green]")
+            else:
+                console.print("[yellow]Review process cancelled. Please stage your desired changes first.[/yellow]")
+                return False, ""
 
         per_file_diffs = await git_utils.get_staged_diff_by_file(repo_path)
         if not per_file_diffs:
