@@ -85,22 +85,19 @@ def show_help():
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 
 def show_repo_stats(repo_context: Dict[str, str], git_context: Dict):
-    file_count = len(repo_context)
-    total_lines = sum(len(content.split('\n')) for content in repo_context.values())
-    extensions = {}
-    for file_path in repo_context.keys():
-        ext = Path(file_path).suffix or 'no extension'
-        extensions[ext] = extensions.get(ext, 0) + 1
+    cwd = Path.cwd()
+    repo_name = cwd.name
+    
     stats_text = f"""
-[bold]Repository Context:[/bold]
-- Total Files Scanned: {file_count}
-- Total Lines of Code: {total_lines}
-- Current Branch: [cyan]{git_context.get('current_branch', 'N/A')}[/cyan]
+[bold]Repository Overview:[/bold]
+- Project: [bold cyan]{repo_name}[/bold cyan]
+- Path: [dim]{cwd}[/dim]
+- Branch: [cyan]{git_context.get('current_branch', 'N/A')}[/cyan]
 
 [bold]Git Status:[/bold]
 [dim]{git_context.get('status', 'N/A') or 'No changes detected'}[/dim]
 """
-    console.print(Panel(stats_text, title="Repository Overview", border_style="blue"))    
+    console.print(Panel(stats_text, title="Repository Status", border_style="blue"))
 
 def show_code_suggestions():
     suggestion_message = (

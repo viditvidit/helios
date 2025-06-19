@@ -47,7 +47,8 @@ async def handle_scan(session):
 
 # --- Git & GitHub Operations ---
 async def handle_git_add(session, files: list[str]):
-    await git_logic.add(files)
+    sanitized_files = [f[1:] if f.startswith('@') else f for f in files]
+    await git_logic.add(sanitized_files)
 
 async def handle_git_commit(session, message: str):
     await git_logic.commit(message)
