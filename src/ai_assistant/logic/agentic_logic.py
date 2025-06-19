@@ -1,5 +1,3 @@
-# src/ai_assistant/logic/agentic_logic.py
-
 import json
 from pathlib import Path
 from rich.console import Console
@@ -62,20 +60,58 @@ class KnightAgent:
         return True, ""
         
     async def _get_initial_plan(self, goal: str) -> list:
+        
         prompt = (
-            "You are 'Knight', an autonomous AI software engineer. Your task is to create a step-by-step plan to achieve a user's goal. "
-            "Think like a senior developer. Use scaffolding tools when available. Be resilient to minor failures.\n\n"
-            f"**User's Goal:** {goal}\n\n"
+            "You are a master software architect AI. Your sole task is to create a JSON array of objects to fulfill a user's goal. "
+            "Your response MUST be a valid JSON array and nothing else. Follow the guidelines strictly.\n\n"
             "**Available Tools:**\n"
             f"{self._format_tools_for_prompt()}\n\n"
-            "**Instructions & Best Practices:**\n"
-            "1. **Python Virtual Environments:** To install packages or run a server in a Python venv, DO NOT try to `source` activate it. Instead, call the python/pip executables directly from the venv's bin folder. Example for macOS/Linux: `venv/bin/python -m pip install fastapi`. Example for Windows: `venv\\Scripts\\python.exe -m pip install fastapi`. The same applies to running a server: `venv/bin/python -m uvicorn main:app`.\n"
-            "2. **Resilience:** For non-critical steps like running tests or linters, set `can_fail: true` in the `run_shell_command` arguments. This prevents the entire plan from aborting if a test fails.\n"
-            "3. **Use Scaffolding:** If the user wants a standard project (e.g., React, Vue), your first step should always be to use `run_shell_command` with their official CLIs (e.g., `npx create-react-app frontend`). Do not create files like `package.json` manually.\n"
-            "4. **Plan Structure:** The plan must be a valid JSON array of objects. Each object needs 'command', 'arguments', and 'reasoning' keys.\n"
-            "5. **Efficiency:** Use `generate_code_concurrently` for writing multiple custom files at once.\n"
-            "6. **Final Command:** The plan MUST end with the command `task_complete`.\n"
-            "7. **Output Format:** Provide ONLY the raw JSON plan. No introductory text or explanations."
+            "**CRITICAL GUIDELINES FOR SUCCESS:**\n"
+            """
+            The user can invoke you in an agentic capacity using `/knight <goal>` or `/knight_hybrid <goal>`. Your role is to formulate a step-by-step plan as a JSON array to achieve this goal.
+            **Key Guidelines for Planning:**
+            1.  **Universal Project Workflow:** Your plan must follow this logical sequence:
+                a.  **Scaffold:** Use `run_shell_command` with the correct official tool (e.g., `npx create-react-app`, `python -m venv`, `mkdir`, etc.) to create the main project directory and structure. **Do not** generate config files like `package.json` manually.
+                b.  **Install Dependencies:** Use `run_shell_command` to install any additional libraries needed (e.g., `npm install axios`, `pip install streamlit`). For `npm`, set `allow_dependency_conflicts: true` to prevent errors.
+                c.  **Generate Code:** Use `generate_code_concurrently` to create all necessary source files. You **must** replace default template files with code that implements the user's actual requirements.
+                d.  **Finalize:** Use `setup_git_and_push` as the last major step to commit all work and push it to a new GitHub repository.
+                e.  **Verify (Optional but Recommended):** For web applications, add a final `run_shell_command` with `background: true` to start the development server.
+            2.  **Working Directories:** Always use the `cwd` parameter in `run_shell_command` when you need to execute commands inside a subdirectory you've created (e.g., `cwd: "my-new-app"`).
+            3.  **Final Command:** The plan MUST end with a single `task_complete` command, including a summary `message` for the user.
+            4.  **Research:** Use the `web_search` and `fetch_web_content` tools to research libraries, find documentation, or resolve errors before writing code.
+
+            ### Shell and File Tools
+
+            -   **`run_shell_command(command, cwd, can_fail, verbose, force_overwrite, background, allow_dependency_conflicts)`**: Executes a shell command. Use for project setup, dependency installation, and running servers.
+            -   **`create_file(file_path_str)`**: Creates a new, empty file.
+            -   **`generate_code_for_file(filename, prompt)`**: Generates and saves code for a single file.
+            -   **`generate_code_concurrently(files)`**: The most efficient way to build a project. Generates code for multiple files in parallel. The `files` argument is a list of dicts, where each dict has `'filename'` and `'prompt'`.
+            -   **`list_files(path)`**: Lists all files and directories recursively to understand project structure.
+
+            ### Code Quality and Analysis Tools
+
+            -   **`optimize_file(filename)`**: Uses AI to analyze and refactor a single file for bugs, performance, and readability.
+            -   **`scan_repository()`**: Performs a high-level AI scan of all files in context to identify potential improvements.
+            -   **`validate_and_fix_json_files(directory, project_only)`**: Validates and attempts to fix all JSON files in a directory. Crucial to run before `npm install` if `package.json` issues are suspected.
+
+            ### Git and GitHub Tools
+
+            -   **`setup_git_and_push(commit_message, repo_name, branch)`**: The primary tool for finalizing a project. It handles staging ALL files, committing, creating the GitHub repo, and pushing the initial commit. Use this as the final step instead of individual git/github tools for new projects.
+            -   **`github_create_repo(repo_name, description, is_private)`**: Creates a new repository on GitHub programmatically. Used by `setup_git_and_push`.
+            -   **`git_add(files)`**: Stages one or more files for commit. Use `files=['.']` to stage all.
+            -   **`git_commit(message)`**: Commits staged changes.
+            -   **`git_push()`**: Pushes committed changes to the remote repository.
+            -   **`git_pull()`**: Pulls the latest changes from the remote repository.
+            -   **`git_switch_branch(branch_name, create)`**: Switches to a different local branch. Can also create a new branch.
+
+            ### Research Tools
+
+            -   **`web_search(query)`**: Performs a Google search to find information, documentation, or library versions.
+            -   **`fetch_web_content(url)`**: Reads the text content of a URL. Use after `web_search` to 'read' a link.
+            -   **`wikipedia_summary(topic)`**: Looks up a topic on Wikipedia to get a concise summary.
+            """
+            "---"
+            f"Generate the JSON plan for the following goal:\n**Goal:** {goal}"
         )
 
         request = CodeRequest(prompt=prompt)
@@ -95,13 +131,13 @@ class KnightAgent:
                 console.print(f"[red]Reason: {error_message}[/red]")
                 json_syntax = Syntax(json.dumps(plan, indent=2), "json", theme="monokai")
                 console.print(Panel(json_syntax, title="[red]Invalid Plan Details[/red]", border_style="red"))
-                return None
+                return []
 
             json_syntax = Syntax(json.dumps(plan, indent=2), "json", theme="monokai", line_numbers=True)
             console.print(Panel(json_syntax, title="📝 Execution Plan", border_style="green"))
             return plan
         except json.JSONDecodeError:
-            console.print("[red]Error: AI did not return a valid JSON plan.[/red]"); console.print(f"[dim]Received: {plan_str}[/dim]"); return None
+            console.print("[red]Error: AI did not return a valid JSON plan.[/red]"); console.print(f"[dim]Received: {plan_str}[/dim]"); return []
 
     async def _execute_plan(self, plan: list):
         github_commands_in_plan = [step for step in plan if 'github' in step.get('command', '')]

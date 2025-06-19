@@ -1,6 +1,7 @@
 from rich.console import Console
 from rich.panel import Panel
 from pyfiglet import Figlet
+from pathlib import Path
 from typing import Dict
 import os
 
@@ -84,7 +85,6 @@ def show_help():
     console.print(Panel(help_text.strip(), border_style="blue", title="Help", title_align="left"))
 
 def show_repo_stats(repo_context: Dict[str, str], git_context: Dict):
-    from pathlib import Path
     file_count = len(repo_context)
     total_lines = sum(len(content.split('\n')) for content in repo_context.values())
     extensions = {}
