@@ -138,6 +138,7 @@ class InteractiveSession:
 
         while True:
             try:
+                console.print("")
                 user_input = await prompt_session.prompt_async("> ")
                 
                 if not user_input.strip(): continue

@@ -160,8 +160,12 @@ async def review_and_commit(show_diff: bool = False) -> tuple[bool, str]:
 
         unstaged = await git_utils.get_unstaged_files(repo_path)
         if unstaged:
-            console.print("[yellow]Unstaged changes detected:[/yellow]")
-            for f in unstaged: console.print(f"  - {f}")
+            unstaged_list = "\n".join([f"  • {f}" for f in unstaged])
+            console.print(Panel(
+                f"[yellow]Unstaged changes detected:[/yellow]\n{unstaged_list}",
+                title="[yellow]Git Status[/yellow]",
+                border_style="yellow"
+            ))
             if await questionary.confirm("Stage these files before reviewing?", default=True, auto_enter=False).ask_async():
                 await git_utils.add_files(repo_path, unstaged)
                 console.print("[green]✓ Staged all detected changes.[/green]")

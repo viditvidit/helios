@@ -69,7 +69,7 @@ class ChatHandler:
                 new_code,
                 filename
             )
-            console.print(Panel(Syntax(diff_text, "diff", theme="monokai"), title=f"Changes for {filename}", 
+            console.print(Panel(Syntax(diff_text, "diff", theme="vim"), title=f"Changes for {filename}", 
                                 border_style="#3776A1"))
             
             if apply_all:
@@ -116,7 +116,7 @@ class ChatHandler:
                         if self._stop_generation:
                             raise asyncio.CancelledError
                         response_content += str(chunk)
-                        live.update(Markdown(response_content, code_theme="monokai"))
+                        live.update(Markdown(response_content, code_theme="vim"))
             
             self.session.last_ai_response_content = response_content
             self.session.conversation_history.append({"role": "assistant", "content": response_content})
