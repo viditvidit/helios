@@ -14,13 +14,50 @@ import wikipediaapi
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TaskProgressColumn
 from rich.text import Text
+from rich.syntax import Syntax
+from rich.panel import Panel
 
-from ...logic import git_logic, github_logic, code_logic, file_logic 
+from ...logic import git_logic, file_logic 
 from ...services.ai_service import AIService
 from ...services.github_service import GitHubService
 from ...models.request import CodeRequest
+from ...utils.git_utils import GitUtils
 
 console = Console()
+
+async def review_and_commit_changes(session, commit_message: str, show_diff: bool = True) -> bool:
+    """
+    A non-interactive tool for the agent to review and commit changes.
+    It stages all unstaged files, displays the diff, and commits with a given message.
+    """
+    git_utils = GitUtils()
+    repo_path = session.config.work_dir
+    
+    if not await git_utils.is_git_repo(repo_path):
+        console.print("[red]Not a git repository.[/red]")
+        return False
+
+    unstaged = await git_utils.get_unstaged_files(repo_path)
+    if unstaged:
+        console.print("[dim]Staging all detected changes...[/dim]")
+        await git_utils.add_files(repo_path, unstaged)
+
+    per_file_diffs = await git_utils.get_staged_diff_by_file(repo_path)
+    if not per_file_diffs:
+        console.print("[yellow]No changes to review or commit.[/yellow]")
+        return True # Not a failure state
+
+    if show_diff:
+        for filename, diff_content in per_file_diffs.items():
+            console.print(Panel(Syntax(diff_content, "diff", theme="monokai", word_wrap=True), title=f"Changes for {filename}", border_style="yellow"))
+    else:
+        summary_lines = [Text(f"  • {f}: ").append(f"+{d.count(chr(10)+'+')} ", style="green").append(f"-{d.count(chr(10)+'-')}", style="red") for f, d in per_file_diffs.items()]
+        console.print(Panel(Text("\n").join(summary_lines), title="Staged Changes Summary", border_style="cyan"))
+
+    console.print(f"Committing with message: [italic]'{commit_message}'[/italic]")
+    await git_utils.commit(repo_path, commit_message)
+    console.print("[green]✓ Changes committed.[/green]")
+    return True
 
 async def generate_code_for_file(session, filename: str, prompt: str) -> bool:
     """Generates code for a single file. Does NOT display its own spinner."""
@@ -120,14 +157,11 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
     work_dir = session.config.work_dir
     run_dir = work_dir / (cwd or '.')
 
-    # Handle force_overwrite for scaffolding tools
     if force_overwrite:
-        # Check if the command is a known scaffolding command and extract the target dir
         scaffold_match = re.search(r'(create-react-app|vite|next|vue create)\s+([^\s]+)', command)
         target_dir_name = None
         if scaffold_match:
             target_dir_name = scaffold_match.group(2)
-        # Handle simple mkdir
         elif command.strip().startswith('mkdir'):
              target_dir_name = command.strip().split(maxsplit=1)[1]
 
@@ -140,7 +174,7 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
     if cwd and not run_dir.exists():
         run_dir.mkdir(parents=True, exist_ok=True)
 
-    console.print(f"Running command: [bold blue]{command}[/bold blue] in [dim]{run_dir}[/dim]")
+    console.print(f"Running command: [bold magenta]{command}[/bold magenta] in [dim]{run_dir}[/dim]")
 
     server_keywords = ['uvicorn', 'npm start', 'npm run dev', 'yarn start', 'yarn dev', 'flask run', 'serve', 'next dev', 'vite']
     if not background and any(keyword in command.lower() for keyword in server_keywords):
@@ -159,7 +193,7 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
             session.background_processes = getattr(session, 'background_processes', [])
             session.background_processes.append(process)
             console.print(f"[green]✓ Command started in background (PID: {process.pid}).[/green]")
-            await asyncio.sleep(3) # Give server time to start up
+            await asyncio.sleep(3)
             return True
 
         if not verbose:
@@ -252,6 +286,11 @@ TOOL_REGISTRY = {
         "function": setup_git_and_push,
         "description": "The primary tool for finalizing a project. It handles staging ALL files, committing, creating the GitHub repo, and pushing the initial commit.",
         "parameters": {"commit_message": "string", "repo_name": "string", "branch": "string (optional, defaults to 'main')"}
+    },
+    "review_and_commit_changes": {
+        "function": review_and_commit_changes,
+        "description": "A powerful tool to stage all files, show a summary of changes, and commit them with a message. Use this for managing changes within an existing repository.",
+        "parameters": {"commit_message": "string"}
     },
     "web_search": {
         "function": web_search, 

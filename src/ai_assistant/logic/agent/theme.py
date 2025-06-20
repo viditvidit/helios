@@ -11,3 +11,4 @@ class Theme:
     SUCCESS = "green"
     PROMPT = "cyan"
     ERROR = "bold red"
+    ACTION_REASONING = "cyan"

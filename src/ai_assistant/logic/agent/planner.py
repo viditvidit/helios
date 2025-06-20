@@ -2,11 +2,10 @@
 
 import json
 import re
-from typing import Dict, List, Tuple, Any, Optional
+from typing import List, Tuple, Any, Optional
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 
 from ...services.ai_service import AIService
 from ...models.request import CodeRequest
@@ -52,6 +51,7 @@ class Planner:
     async def get_plan(self, goal: str) -> Optional[List[Any]]:
         """
         Generates a plan from the AI to achieve the given goal.
+        This happens silently without printing the plan to the console.
         """
         current_model_config = self.config.get_current_model()
         base_system_prompt = current_model_config.system_prompt
@@ -74,7 +74,7 @@ class Planner:
         
         request = CodeRequest(prompt=final_prompt)
         plan_str = ""
-        with console.status(f"[{Theme.PROMPT}]The Knight is formulating a plan...[/{Theme.PROMPT}]"):
+        with console.status(f"[{Theme.ACTION_REASONING}]Thinking...[/{Theme.ACTION_REASONING}]"):
             async with AIService(self.config) as ai_service:
                 async for chunk in ai_service.stream_generate(request):
                     plan_str += chunk
@@ -92,10 +92,9 @@ class Planner:
                 console.print(Panel(f"[bold]Error:[/bold] The AI generated an invalid plan.\n[bold]Reason:[/bold] {error_message}", border_style=Theme.ERROR, title=f"[{Theme.ERROR}]Plan Invalid[/{Theme.ERROR}]"))
                 return None
             
-            json_syntax = Syntax(json.dumps(plan, indent=2), "json", theme="vim", line_numbers=True)
-            console.print(Panel(json_syntax, title=f"[{Theme.PLAN_TITLE}]Execution Plan[/{Theme.PLAN_TITLE}]", border_style=Theme.PLAN_TITLE))
+            # The plan is now generated and validated silently.
             return plan
-        except json.JSONDecodeError as e:
-            console.print(Panel(f"[bold]Error:[/bold] AI did not return a valid JSON plan. {e}", border_style=Theme.ERROR, title=f"[{Theme.ERROR}]JSON Decode Error[/{Theme.ERROR}]"))
-            console.print(f"[dim]Received: {plan_str}[/dim]")
+            
+        except json.JSONDecodeError:
+            # We don't need to show the full error in this new UX, just that it failed.
             return None

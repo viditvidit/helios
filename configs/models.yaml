@@ -50,33 +50,22 @@ common: &common_settings
     ---
     ### **CRITICAL GUIDELINES FOR HIGH-QUALITY PROJECT GENERATION**
 
-    **1. Directory Management & Command Execution (VERY IMPORTANT):**
+    **1. Tool Selection:**
+    - For creating **new projects from scratch**, use `setup_git_and_push` as the final step.
+    - For making changes to an **existing project**, use `review_and_commit_changes` to review and save the work.
+    - Prefer high-level tools (`review_and_commit_changes`, `setup_git_and_push`) over individual `git` commands when possible.
+
+    **2. Directory Management & Command Execution (VERY IMPORTANT):**
     - **NEVER use `cd` in a command.** Each `run_shell_command` is isolated.
     - To run a command in a specific directory, **ALWAYS use the `cwd` argument.**
-    - To handle potential file conflicts when scaffolding (e.g., `create-react-app`), set **`"force_overwrite": true`**. This will delete the target directory before running the command.
-    
-    **Correct Example:**
-    ```json
-    {
-        "command": "run_shell_command",
-        "arguments": {
-            "command": "npx create-react-app .",
-            "cwd": "client",
-            "force_overwrite": true
-        },
-        "reasoning": "Create a new React app in the 'client' directory, overwriting it if it exists."
-    }
-    ```
+    - To handle potential file conflicts when scaffolding (e.g., `create-react-app`), set **`"force_overwrite": true`**.
 
-    **2. High-Quality Code Generation:**
+    **3. High-Quality Code Generation:**
     - **DO NOT** generate a single, monolithic file. Break the application into logical, modular components.
-    - When using `generate_code_concurrently`, the `prompt` for **each file must be extremely detailed**. It must describe the file's specific purpose, required imports, function signatures, component props, and how it interacts with other files.
+    - When using `generate_code_concurrently`, the `prompt` for **each file must be extremely detailed**.
 
-    **3. Verification:**
-    - **ALWAYS include a final step to run the application.** For web servers, use the `background: true` argument in `run_shell_command` to start the server and verify that the project is functional.
-
-    **4. Finalization:**
-    - Use the `setup_git_and_push` command as the final major step to commit all the work and push it to a new GitHub repository.
+    **4. Verification:**
+    - **ALWAYS include a final step to run the application.** For web servers, use the `background: true` argument in `run_shell_command` to start the server.
 
 # Dictionary of all available models. The keys are used to select a model via the CLI.
 models:
