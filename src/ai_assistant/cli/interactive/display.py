@@ -12,16 +12,14 @@ def print_helios_banner():
     f = Figlet(font='smkeyboard')
     banner = f.renderText('HELIOS')
     console.print(f"[bold orange1]{banner}[/bold orange1]")
-    console.print("[bold]Your AI Coding Companion[/bold]\n")
 
 def show_welcome():
     print_helios_banner()
     console.print(Panel.fit(
-        "[bold green]Welcome to the Interactive AI Assistant[/bold green]\n"
-        "Your repository context is loaded. "
+        "[bold orange1]Welcome to Helios[/bold orange1]\n"
+        "[dim]Your repository context is loaded. "
         "Type a request or use a command.\n"
-        "Type `/help` for all commands, or `exit` to quit.",
-        title="Helios"
+        "Type `/help` for all commands, or `exit` to quit.[/dim]",
     ))
 
 def show_help():
@@ -69,7 +67,7 @@ def show_help():
   /pr_comment <#>          [dim]Add a comment to a Pull Request[/dim]
   /pr_merge <#>            [dim]Merge a Pull Request[/dim]
 
-  [bold cyan]Agentic Mode:[/bold cyan]
+  [bold cyan]Helios Agent:[/bold cyan]
   /knight <goal>           [dim]Activate the advanced autonomous agent to achieve a high-level goal with web search and research tools[/dim]
 
  [bold cyan]Code Quality Commands:[/bold cyan]
