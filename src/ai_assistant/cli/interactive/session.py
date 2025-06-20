@@ -6,7 +6,6 @@ from typing import Optional, Iterable
 
 from rich.console import Console
 import questionary
-
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion, FuzzyCompleter
 from prompt_toolkit.formatted_text import StyleAndTextTuples

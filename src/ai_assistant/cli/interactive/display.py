@@ -18,7 +18,7 @@ def show_welcome():
     console.print(Panel.fit(
         "[bold orange1]Welcome to Helios[/bold orange1]\n"
         "[dim]Your repository context is loaded. "
-        "Type a request or use a command.\n"
+        "Type a request or use a /command.\n"
         "Type `/help` for all commands, or `exit` to quit.[/dim]",
     ))
 

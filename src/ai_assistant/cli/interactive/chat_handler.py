@@ -8,13 +8,12 @@ from rich.spinner import Spinner
 from rich.markdown import Markdown
 from rich.syntax import Syntax
 import questionary
-from typing import Optional, List
+from typing import Optional
 
 from ...services.ai_service import AIService
 from ...models.request import CodeRequest
 from ...utils.parsing_utils import extract_code_blocks
 from ...utils.file_utils import build_repo_context, FileUtils
-from . import display
 
 console = Console()
 
