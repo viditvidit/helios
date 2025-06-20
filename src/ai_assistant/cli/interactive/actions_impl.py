@@ -2,7 +2,8 @@ import questionary
 from rich.console import Console
 from pathlib import Path
 
-from ...logic import file_logic, git_logic, github_logic, indexing_logic, code_logic, agentic_logic, agentic_logic_hybrid
+from ...logic.agent import agent_main
+from ...logic import file_logic, git_logic, github_logic, indexing_logic, code_logic
 from ...services.github_service import GitHubService
 from ...utils.git_utils import GitUtils
 
@@ -184,9 +185,5 @@ async def handle_pr_request_review(session, args):
 
 # --- NEW Agentic Command ---
 async def handle_knight_mode(session, goal: str):
-    """Dispatcher for the /knight agentic mode."""
-    await agentic_logic.run_knight_mode(session, goal)
-
-async def handle_knight_hybrid_mode(session, goal: str):
-    """Dispatcher for the more powerful /knight_hybrid agentic mode."""
-    await agentic_logic_hybrid.run_knight_hybrid_mode(session, goal)
+    """Dispatcher for the unified /knight agentic mode."""
+    await agent_main.run_knight_mode(session, goal)

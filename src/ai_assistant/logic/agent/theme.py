@@ -1,0 +1,10 @@
+class Theme:
+    """Centralized color theme for the agent's UI components."""
+    HEADER = "#81A1C1"
+    GOAL = "#D8DEE9"
+    PLAN_TITLE = "#B48EAD"
+    STEP_HEADER = "#5E81AC"
+    REASONING = "#ABEDFF"
+    SUCCESS = "#A3BE8C"
+    PROMPT = "#54A7FF"
+    ERROR = "#BF616A"

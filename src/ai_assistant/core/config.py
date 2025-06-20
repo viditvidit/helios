@@ -20,11 +20,12 @@ except Exception:
 @dataclass
 class ModelConfig:
     name: str
-    type: str  # e.g., 'ollama'
+    type: str 
     endpoint: str
     context_length: int
     temperature: float
     system_prompt: str
+    agent_instructions: str
     api_key: Optional[str] = None
     max_tokens: int = 80000
     timeout: int = 1200
