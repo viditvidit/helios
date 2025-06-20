@@ -78,11 +78,6 @@ async def switch(branch_name: str = None, create: bool = False):
             "Choose a branch to switch to:",
             choices=choices,
             use_indicator=True,
-            style=questionary.Style([
-                ('pointer', 'bold fg:cyan'),
-                ('selected', 'fg:green'),
-                ('highlighted', 'fg:green bold'),
-            ])
         ).ask_async()
 
         if selected_branch:
@@ -156,7 +151,6 @@ async def review_and_commit(show_diff: bool = False) -> tuple[bool, str]:
 
         unstaged = await git_utils.get_unstaged_files(repo_path)
         if unstaged:
-            # --- THE UI POLISH: Use a Panel for a cleaner look ---
             unstaged_list = "\n".join([f"  • {f}" for f in unstaged])
             console.print(Panel(
                 f"Unstaged changes detected:\n{unstaged_list}",
@@ -177,10 +171,17 @@ async def review_and_commit(show_diff: bool = False) -> tuple[bool, str]:
 
         if show_diff:
             for filename, diff_content in per_file_diffs.items():
-                console.print(Panel(Syntax(diff_content, "diff", theme="github-dark", word_wrap=True), title=f"{filename}"))
+                console.print(Panel(Syntax(diff_content, "diff", theme="github-dark", word_wrap=True), title=f"Diff for [cyan]{filename}[/cyan]"))
         else:
-            summary_lines = [Text(f"{f}: ").append(f"+{d.count('\n+')} ", style="green").append(f"-{d.count('\n-')}", style="red") for f, d in per_file_diffs.items()]
-            console.print(Text("\n").join(summary_lines))
+            # --- THIS IS THE MODIFIED SECTION ---
+            summary_lines = [Text(f"  • {f}: ").append(f"+{d.count(chr(10)+'+')} ", style="green").append(f"-{d.count(chr(10)+'-')}", style="red") for f, d in per_file_diffs.items()]
+            panel_content = Text("\n").join(summary_lines)
+            console.print(Panel(
+                panel_content,
+                title="[cyan]Staged Changes Summary[/cyan]",
+                border_style="cyan"
+            ))
+            # --- END OF MODIFICATION ---
 
         if not await questionary.confirm("\nProceed to commit these changes?", default=True, auto_enter=False).ask_async():
             console.print("[yellow]Commit aborted.[/yellow]")
