@@ -173,15 +173,13 @@ async def review_and_commit(show_diff: bool = False) -> tuple[bool, str]:
             for filename, diff_content in per_file_diffs.items():
                 console.print(Panel(Syntax(diff_content, "diff", theme="github-dark", word_wrap=True), title=f"Diff for [cyan]{filename}[/cyan]"))
         else:
-            # --- THIS IS THE MODIFIED SECTION ---
             summary_lines = [Text(f"  • {f}: ").append(f"+{d.count(chr(10)+'+')} ", style="green").append(f"-{d.count(chr(10)+'-')}", style="red") for f, d in per_file_diffs.items()]
             panel_content = Text("\n").join(summary_lines)
             console.print(Panel(
                 panel_content,
-                title="[cyan]Staged Changes Summary[/cyan]",
+                title="[cyan]Staged Changes[/cyan]",
                 border_style="cyan"
             ))
-            # --- END OF MODIFICATION ---
 
         if not await questionary.confirm("\nProceed to commit these changes?", default=True, auto_enter=False).ask_async():
             console.print("[yellow]Commit aborted.[/yellow]")
