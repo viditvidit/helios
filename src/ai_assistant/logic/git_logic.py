@@ -54,23 +54,19 @@ async def switch(branch_name: str = None, create: bool = False):
         console.print("[red]Not a git repository.[/red]")
         return False
 
-    # --- NEW INTERACTIVE LOGIC ---
     if branch_name:
-        # If a branch name is given, try to switch directly first.
         if await git_utils.switch_branch(repo_path, branch_name, create=create):
             console.print(f"[green]✓ Switched to branch '{branch_name}'.[/green]")
             return True
         else:
             console.print(f"[red]Failed to switch to branch '{branch_name}'.[/red]")
     
-    # --- Interactive Selector ---
     try:
         with console.status("[dim]Fetching available branches...[/dim]"):
             local_branches = await git_utils.get_local_branches(repo_path)
             remote_branches = await git_utils.get_all_branches(repo_path)
             current_branch = await git_utils.get_current_branch(repo_path)
 
-        # Combine, sort, and remove duplicates and the current branch
         all_branches = sorted(list(set(local_branches + remote_branches)))
         choices = [b for b in all_branches if b != current_branch]
 
@@ -98,7 +94,7 @@ async def switch(branch_name: str = None, create: bool = False):
                 return False
         else:
             console.print("[yellow]Branch switch cancelled.[/yellow]")
-            return True # User cancelled, not a failure.
+            return True
 
     except Exception as e:
         console.print(f"[red]An error occurred while trying to switch branches: {e}[/red]")
@@ -160,9 +156,10 @@ async def review_and_commit(show_diff: bool = False) -> tuple[bool, str]:
 
         unstaged = await git_utils.get_unstaged_files(repo_path)
         if unstaged:
+            # --- THE UI POLISH: Use a Panel for a cleaner look ---
             unstaged_list = "\n".join([f"  • {f}" for f in unstaged])
             console.print(Panel(
-                f"[yellow]Unstaged changes detected:[/yellow]\n{unstaged_list}",
+                f"Unstaged changes detected:\n{unstaged_list}",
                 title="[yellow]Git Status[/yellow]",
                 border_style="yellow"
             ))

@@ -1,3 +1,5 @@
+# src/ai_assistant/logic/agent/tools.py
+
 import asyncio
 import os
 import json
@@ -114,17 +116,33 @@ async def github_create_repo_non_interactive(session, repo_name: str, descriptio
         console.print(f"[red]Error ensuring GitHub repo exists: {e}[/red]")
         return False
 
-async def run_shell_command(session, command: str, cwd: str = None, can_fail: bool = False, verbose: bool = False, background: bool = False) -> bool:
+async def run_shell_command(session, command: str, cwd: str = None, can_fail: bool = False, verbose: bool = False, background: bool = False, force_overwrite: bool = False) -> bool:
     work_dir = session.config.work_dir
     run_dir = work_dir / (cwd or '.')
 
-    if not run_dir.exists():
-        console.print(f"[yellow]Note: Working directory '{run_dir.relative_to(work_dir)}' does not exist. Creating it now.[/yellow]")
+    # Handle force_overwrite for scaffolding tools
+    if force_overwrite:
+        # Check if the command is a known scaffolding command and extract the target dir
+        scaffold_match = re.search(r'(create-react-app|vite|next|vue create)\s+([^\s]+)', command)
+        target_dir_name = None
+        if scaffold_match:
+            target_dir_name = scaffold_match.group(2)
+        # Handle simple mkdir
+        elif command.strip().startswith('mkdir'):
+             target_dir_name = command.strip().split(maxsplit=1)[1]
+
+        if target_dir_name:
+            target_path = run_dir / target_dir_name
+            if target_path.exists():
+                console.print(f"[yellow]Force overwrite enabled. Removing existing directory: {target_path}[/yellow]")
+                shutil.rmtree(target_path)
+    
+    if cwd and not run_dir.exists():
         run_dir.mkdir(parents=True, exist_ok=True)
 
-    console.print(f"Running command: [bold magenta]{command}[/bold magenta] in [dim]{run_dir}[/dim]")
+    console.print(f"Running command: [bold blue]{command}[/bold blue] in [dim]{run_dir}[/dim]")
 
-    server_keywords = ['uvicorn', 'npm start', 'yarn start', 'flask run', 'serve', 'next dev', 'vite']
+    server_keywords = ['uvicorn', 'npm start', 'npm run dev', 'yarn start', 'yarn dev', 'flask run', 'serve', 'next dev', 'vite']
     if not background and any(keyword in command.lower() for keyword in server_keywords):
         background = True
         console.print(f"[yellow]Detected server command. Running in background mode.[/yellow]")
@@ -141,7 +159,7 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
             session.background_processes = getattr(session, 'background_processes', [])
             session.background_processes.append(process)
             console.print(f"[green]✓ Command started in background (PID: {process.pid}).[/green]")
-            await asyncio.sleep(2) # Give server time to start up before next step
+            await asyncio.sleep(3) # Give server time to start up
             return True
 
         if not verbose:
@@ -154,8 +172,7 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
             console.print(f"[green]✓ Shell command finished successfully.[/green]")
             return True
         
-        stdout_text = stdout.decode().strip()
-        stderr_text = stderr.decode().strip()
+        stdout_text, stderr_text = stdout.decode().strip(), stderr.decode().strip()
         
         if 'already exists' in stderr_text.lower() or 'already up to date' in stderr_text.lower():
             console.print(f"[yellow]✓ Resource already exists or is up to date. Continuing.[/yellow]")
@@ -196,14 +213,12 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
         return False
 
     clone_url = getattr(session, 'repo_clone_url', None)
-    if not clone_url:
-        return False
+    if not clone_url: return False
 
     try:
         await git_utils._run_git_command(work_dir, ['remote', 'add', 'origin', clone_url])
-    except Exception as e:
-        if "remote origin already exists" in str(e).lower():
-            await git_utils._run_git_command(work_dir, ['remote', 'set-url', 'origin', clone_url])
+    except Exception:
+        await git_utils._run_git_command(work_dir, ['remote', 'set-url', 'origin', clone_url])
     
     await git_utils._run_git_command(work_dir, ['branch', '-M', branch])
     
@@ -212,7 +227,7 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
         console.print(f"[green]✓ Successfully pushed project to GitHub![/green]")
         return True
     except Exception:
-        console.print(f"[yellow]Initial push failed. Attempting to pull, merge, and re-push...[/yellow]")
+        console.print(f"[yellow]Initial push failed. Attempting to reconcile and re-push...[/yellow]")
         try:
             await git_utils._run_git_command(work_dir, ['pull', 'origin', branch, '--allow-unrelated-histories', '--no-edit'])
             await git_utils.push(work_dir, branch)
@@ -226,7 +241,7 @@ TOOL_REGISTRY = {
     "run_shell_command": {
         "function": run_shell_command,
         "description": "Executes a shell command. Use for project setup, dependency installation, and running servers.",
-        "parameters": { "command": "string", "cwd": "string (optional)", "can_fail": "boolean (optional)", "verbose": "boolean (optional)", "background": "boolean (optional)" }
+        "parameters": { "command": "string", "cwd": "string (optional)", "can_fail": "boolean (optional)", "verbose": "boolean (optional)", "background": "boolean (optional)", "force_overwrite": "boolean (optional)" }
     },
     "generate_code_concurrently": {
         "function": generate_code_concurrently,

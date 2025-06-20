@@ -2,6 +2,7 @@
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.text import Text
 
 from .planner import Planner
 from .executor import Executor
@@ -22,7 +23,7 @@ async def run_knight_mode(session, goal: str):
 
     plan = await planner.get_plan(goal)
     if not plan:
-        console.print(Panel("Could not formulate a valid plan. Aborting.", border_style=Theme.ERROR, title="[bold red]Planning Failed[/bold red]"))
+        console.print(Panel("Could not formulate a valid plan. Aborting.", border_style=Theme.ERROR, title=f"[{Theme.ERROR}]Planning Failed[/{Theme.ERROR}]"))
         return
 
     await executor.execute_plan(plan)

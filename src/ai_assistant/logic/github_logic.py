@@ -96,11 +96,9 @@ async def interactive_pr_creation(session):
         if not await git_utils.is_git_repo(repo_path): raise NotAGitRepositoryError(path=repo_path)
         console.print("\n[bold cyan]Creating a new Pull Request...[/bold cyan]")
         
-        # Get current branch first
         current_branch = await git_utils.get_current_branch(repo_path)
         console.print(f"[dim]Currently on branch: {current_branch}[/dim]")
         
-        # Check if current branch is main/master - warn user
         if current_branch in ['main', 'master']:
             console.print("[yellow]⚠️  You're on the main branch. Consider creating a feature branch first.[/yellow]")
         
@@ -109,15 +107,22 @@ async def interactive_pr_creation(session):
             choices=[
                 f"Use current branch ({current_branch})",
                 "Create new branch", 
-                "Switch to different branch"
+                "Switch to different branch",
+                "Cancel" # Added explicit cancel option
             ]
         ).ask_async()
         
-        head_branch = ""
+        # --- THE FIX: Handle cancellation (None) or explicit "Cancel" choice ---
+        if branch_action is None or branch_action == "Cancel":
+            console.print("[yellow]Pull Request creation cancelled.[/yellow]")
+            return
 
+        head_branch = ""
         if branch_action == "Create new branch":
             new_branch_name = await questionary.text("Enter name for the new feature branch:").ask_async()
-            if not new_branch_name: return console.print("[red]Branch name cannot be empty.[/red]")
+            if not new_branch_name: 
+                console.print("[red]Branch name cannot be empty. Aborting PR creation.[/red]")
+                return
             await git_utils.switch_branch(repo_path, new_branch_name, create=True)
             head_branch = new_branch_name
             console.print(f"[green]✓ Created and switched to branch '{head_branch}'.[/green]")
@@ -132,22 +137,25 @@ async def interactive_pr_creation(session):
                 head_branch = current_branch
             else:
                 head_branch = await questionary.select("Switch to which branch?", choices=other_branches).ask_async()
+                if not head_branch:
+                    console.print("[yellow]Branch switch cancelled. Aborting PR creation.[/yellow]")
+                    return
                 await git_utils.switch_branch(repo_path, head_branch)
                 console.print(f"[green]✓ Switched to branch '{head_branch}' for PR.[/green]")
         
-        # Push the branch to remote
         with console.status(f"[yellow]Pushing '{head_branch}' to remote...[/yellow]"):
             await git_utils.push(repo_path, head_branch, set_upstream=True)
 
         title = await questionary.text("PR Title:").ask_async()
-        if not title: return console.print("[red]Title cannot be empty.[/red]")
+        if not title: 
+            console.print("[red]Title cannot be empty. Aborting PR creation.[/red]")
+            return
+            
         body = await questionary.text("PR Body (optional):").ask_async()
         base = await questionary.text("Target branch:", default="main").ask_async()
         
-        # Validate that head_branch != base
         if head_branch == base:
             console.print(f"[red]Error: Cannot create PR from '{head_branch}' to '{base}' (same branch)[/red]")
-            console.print("[yellow]Tip: Make sure you're on a feature branch, not the main branch[/yellow]")
             return
         
         console.print(f"[cyan]Creating PR: {head_branch} → {base}[/cyan]")
@@ -182,7 +190,6 @@ async def pr_review(session, pr_number_str: str):
         with console.status(f"[yellow]Generating AI review...[/yellow]"):
             summary = await service.get_ai_pr_summary(pr_number)
         
-        # Create Markdown object and wrap it in Panel with proper title
         markdown_content = Markdown(summary)
         console.print(Panel(
             markdown_content, 

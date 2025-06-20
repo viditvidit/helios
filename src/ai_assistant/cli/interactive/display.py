@@ -70,9 +70,7 @@ def show_help():
   /pr_merge <#>            [dim]Merge a Pull Request[/dim]
 
   [bold cyan]Agentic Mode:[/bold cyan]
-  /knight <goal>           [dim]Activate the autonomous agent to achieve a high-level goal[/dim]
-  /knight_hybrid <goal>    [dim]Activate the advanced hybrid agent with web search and research tools[/dim]
-
+  /knight <goal>           [dim]Activate the advanced autonomous agent to achieve a high-level goal with web search and research tools[/dim]
 
  [bold cyan]Code Quality Commands:[/bold cyan]
   /optimize <filename>     [dim]Ask the AI to optimize/refactor a specific file[/dim]

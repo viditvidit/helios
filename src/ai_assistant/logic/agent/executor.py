@@ -1,3 +1,5 @@
+# src/ai_assistant/logic/agent/executor.py
+
 import inspect
 from pathlib import Path
 from typing import List, Any
@@ -5,7 +7,6 @@ from typing import List, Any
 import questionary
 from rich.console import Console
 from rich.panel import Panel
-from rich.rule import Rule
 from rich.text import Text
 
 from ...logic import github_logic
@@ -36,23 +37,26 @@ class Executor:
             return
 
         console.print()
+        total_steps = len([s for s in plan if s.get('command') != 'task_complete'])
+        
         for i, step in enumerate(plan):
             command_name = step.get("command")
             reasoning = step.get('reasoning', 'No reasoning provided.')
 
             if command_name == "task_complete":
                 message = step.get('arguments', {}).get('message', 'The task is complete.')
-                console.print(Panel(f"[bold]✨ Knight Task Complete ✨[/bold]\n\n{message}", border_style=Theme.SUCCESS, title="[bold green]Success[/bold green]"))
+                console.print(Panel(f"[bold]Knight Task Complete[/bold]\n\n{message}", border_style=Theme.SUCCESS, title="[bold green]Success[/bold green]"))
                 break
 
-            console.print(Rule(f"[bold {Theme.STEP_HEADER}]Step {i+1}/{len(plan)}: {command_name}[/bold {Theme.STEP_HEADER}]"))
-            console.print(Text("Reasoning: ", style=f"bold {Theme.REASONING}") + Text(f"{reasoning}", style="italic dim"))
+            step_title = f"Step {i+1}/{total_steps}: [bold]{command_name}[/bold]"
+            step_content = Text("Reasoning: ", style=Theme.REASONING) + Text(reasoning)
+            
+            console.print(Panel(step_content, title=step_title, border_style=Theme.STEP_PANEL_BORDER, title_align="left"))
             
             args = step.get("arguments", {})
             if command_name in self.tools:
                 tool_func = self.tools[command_name]['function']
                 
-                # Inject session automatically if the tool needs it
                 sig = inspect.signature(tool_func)
                 if 'session' in sig.parameters:
                     args['session'] = self.session
