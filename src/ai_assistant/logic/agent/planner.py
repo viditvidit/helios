@@ -2,10 +2,11 @@
 
 import json
 import re
-from typing import List, Tuple, Any, Optional
+from typing import Dict, List, Tuple, Any, Optional
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.syntax import Syntax
 
 from ...services.ai_service import AIService
 from ...models.request import CodeRequest
@@ -44,14 +45,30 @@ class Planner:
             command = step.get("command")
             if not command:
                 return False, f"Step {i+1} is missing the required 'command' key."
-            if command != "task_complete" and command not in self.tools:
+            if command not in self.tools and command not in ["task_complete"]:
                 return False, f"Step {i+1} uses an unknown command: '{command}'."
         return True, ""
 
+    def _extract_json_from_response(self, response: str) -> Optional[str]:
+        """
+        Extracts a JSON array from the model's response, handling markdown fences.
+        """
+        # First, try to find JSON within a markdown code block
+        match = re.search(r'```json\s*(\[.*\])\s*```', response, re.DOTALL)
+        if match:
+            return match.group(1)
+        
+        # If not in a code block, try to find any JSON array
+        match = re.search(r'(\[.*\])', response, re.DOTALL)
+        if match:
+            return match.group(1)
+            
+        return None
+
     async def get_plan(self, goal: str) -> Optional[List[Any]]:
         """
-        Generates a plan from the AI to achieve the given goal.
-        This happens silently without printing the plan to the console.
+        Generates and validates a plan from the AI.
+        This version is simplified as the Executor now handles all presentation.
         """
         current_model_config = self.config.get_current_model()
         base_system_prompt = current_model_config.system_prompt
@@ -59,42 +76,44 @@ class Planner:
         formatted_tools = self._format_tools_for_prompt()
 
         if not agent_instructions:
-             console.print(f"[{Theme.ERROR}]Error: Agent instructions are not defined in models.yaml for the current model.[/{Theme.ERROR}]")
+             console.print(f"[{Theme.ERROR}]Error: Agent instructions are not defined in models.yaml.[/{Theme.ERROR}]")
              return None
 
         final_prompt = (
             f"{base_system_prompt}\n\n"
-            f"## Agentic Mode Instructions\n\n"
-            f"{agent_instructions}\n\n"
-            f"### Available Tools\n\n"
-            f"{formatted_tools}\n\n"
+            f"## Agentic Mode Instructions\n{agent_instructions}\n\n"
+            f"### Available Tools\n{formatted_tools}\n\n"
             f"---\n"
-            f"Generate the JSON plan for the following goal:\n**Goal:** {goal}"
+            f"**User Request:** {goal}"
         )
         
         request = CodeRequest(prompt=final_prompt)
-        plan_str = ""
-        with console.status(f"[{Theme.ACTION_REASONING}]Thinking...[/{Theme.ACTION_REASONING}]"):
+        raw_response = ""
+        with console.status(f"[{Theme.PROMPT}][dim]The Knight is formulating a plan...[/dim][/{Theme.PROMPT}]"):
             async with AIService(self.config) as ai_service:
                 async for chunk in ai_service.stream_generate(request):
-                    plan_str += chunk
+                    raw_response += chunk
+
+        plan_str = self._extract_json_from_response(raw_response)
+        
+        if not plan_str:
+            console.print(Panel("The AI did not return a valid plan in the expected format.", border_style=Theme.ERROR, title=f"[{Theme.ERROR}]Planning Error[/{Theme.ERROR}]"))
+            console.print("[bold dim]Model's Raw Response:[/bold dim]")
+            console.print(f"[dim]{raw_response}[/dim]")
+            return None
 
         try:
-            json_match = re.search(r'\[.*\]', plan_str, re.DOTALL)
-            if not json_match:
-                raise json.JSONDecodeError("No JSON array found in the AI response.", plan_str, 0)
-            
-            plan_str = json_match.group(0)
             plan = json.loads(plan_str)
-
             is_valid, error_message = self._validate_plan(plan)
+            
             if not is_valid:
                 console.print(Panel(f"[bold]Error:[/bold] The AI generated an invalid plan.\n[bold]Reason:[/bold] {error_message}", border_style=Theme.ERROR, title=f"[{Theme.ERROR}]Plan Invalid[/{Theme.ERROR}]"))
                 return None
             
-            # The plan is now generated and validated silently.
             return plan
             
-        except json.JSONDecodeError:
-            # We don't need to show the full error in this new UX, just that it failed.
+        except json.JSONDecodeError as e:
+            console.print(Panel(f"[bold]Error:[/bold] Failed to decode the JSON plan. {e}", border_style=Theme.ERROR, title=f"[{Theme.ERROR}]JSON Decode Error[/{Theme.ERROR}]"))
+            console.print("[bold dim]Extracted JSON String:[/bold dim]")
+            console.print(f"[dim]{plan_str}[/dim]")
             return None

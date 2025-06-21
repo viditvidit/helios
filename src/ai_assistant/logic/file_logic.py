@@ -94,30 +94,31 @@ async def new_file(session, file_path_str: str):
         return False
 
 # --- MODIFIED TO PASS THE SESSION OBJECT ---
-async def save_code(session, filename: str):
-    """Logic to save the last code block to a file."""
-    if not filename:
-        console.print("[red]Usage: /save <filename>[/red]")
+async def save_code(session, file_path_str: str, code_to_save: str = None):
+    """Logic to save code to a specific file path."""
+    if not file_path_str:
+        console.print("[red]Filename cannot be empty.[/red]")
         return False
-    if not session.last_ai_response_content:
-        console.print("[red]No AI response available to save from.[/red]")
-        return False
+    
+    # --- THE FIX: If code is not provided, get it from the last response ---
+    if code_to_save is None:
+        if not session.last_ai_response_content:
+            console.print("[red]No AI response available to save from.[/red]")
+            return False
+        code_blocks = extract_code_blocks(session.last_ai_response_content)
+        if not code_blocks:
+            console.print("[red]No code blocks found in the last AI response.[/red]")
+            return False
+        code_to_save = code_blocks[0]['code']
 
-    code_blocks = extract_code_blocks(session.last_ai_response_content)
-    if not code_blocks:
-        console.print("[red]No code blocks found in the last AI response.[/red]")
-        return False
-
-    code_to_save = code_blocks[0]['code']
-    path = session.file_service.work_dir.joinpath(filename)
-    action_verb = "Updated" if path.exists() else "Created"
+    # The path is now a full path string provided by the caller
+    path = Path(file_path_str)
     
     try:
         await session.file_service.write_file(path, code_to_save)
-        console.print(f"[green]✓ {action_verb} file: {filename}[/green]")
-        relative_path_str = str(path.relative_to(Path.cwd()))
+        relative_path_str = str(path.relative_to(session.config.work_dir))
+        console.print(f"[green]✓ Saved changes to {relative_path_str}[/green]")
         session.current_files[relative_path_str] = code_to_save
-        console.print(f"[green]✓ {relative_path_str} is now in the active context.[/green]")
         return True
     except Exception as e:
         console.print(f"[red]Error saving file: {e}[/red]")

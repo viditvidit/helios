@@ -1,16 +1,16 @@
 # src/ai_assistant/logic/agent/tools.py
 
 import asyncio
-import os
-import json
 import re
 import shutil
 from typing import List, Dict, Any
-
+import questionary
+import platform
 import requests
 from bs4 import BeautifulSoup
+from pathlib import Path
+
 from googlesearch import search as google_search
-import wikipediaapi
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TaskProgressColumn
 from rich.text import Text
@@ -24,6 +24,16 @@ from ...models.request import CodeRequest
 from ...utils.git_utils import GitUtils
 
 console = Console()
+
+async def create_project_workspace(session, directory_name: str) -> bool:
+    """Creates the main project directory. This should be the first step for any new project."""
+    work_dir = session.config.work_dir / directory_name
+    if work_dir.exists():
+        console.print(f"[yellow]Workspace directory '{directory_name}' already exists. Using it.[/yellow]")
+    else:
+        work_dir.mkdir(parents=True)
+        console.print(f"[green]✓ Created project workspace: {directory_name}[/green]")
+    return True
 
 async def review_and_commit_changes(session, commit_message: str, show_diff: bool = True) -> bool:
     """
@@ -49,7 +59,7 @@ async def review_and_commit_changes(session, commit_message: str, show_diff: boo
 
     if show_diff:
         for filename, diff_content in per_file_diffs.items():
-            console.print(Panel(Syntax(diff_content, "diff", theme="monokai", word_wrap=True), title=f"Changes for {filename}", border_style="yellow"))
+            console.print(Panel(Syntax(diff_content, "diff", theme="vim", word_wrap=True), title=f"Changes for {filename}", border_style="yellow"))
     else:
         summary_lines = [Text(f"  • {f}: ").append(f"+{d.count(chr(10)+'+')} ", style="green").append(f"-{d.count(chr(10)+'-')}", style="red") for f, d in per_file_diffs.items()]
         console.print(Panel(Text("\n").join(summary_lines), title="Staged Changes Summary", border_style="cyan"))
@@ -59,64 +69,117 @@ async def review_and_commit_changes(session, commit_message: str, show_diff: boo
     console.print("[green]✓ Changes committed.[/green]")
     return True
 
-async def generate_code_for_file(session, filename: str, prompt: str) -> bool:
-    """Generates code for a single file. Does NOT display its own spinner."""
-    generation_prompt = (
-        "You are a code-writing AI. Your only task is to generate the raw code for a single file based on the user's request. "
-        "Your output must be ONLY the code itself.\n\n"
-        "**CRITICAL INSTRUCTIONS:**\n"
-        "- DO NOT include any explanations, introductory text, or summaries.\n"
-        "- DO NOT wrap the code in markdown code blocks like ```python.\n"
-        "- DO NOT include the command to run the file.\n\n"
-        f"**File to create:** `{filename}`\n"
-        f"**Code to generate based on this prompt:** {prompt}"
-    )
-    request = CodeRequest(prompt=generation_prompt)
+async def run_shell_command(session, command: str, cwd: str, can_fail: bool = False, verbose: bool = False, background: bool = False, force_overwrite: bool = False) -> bool:
+    """Executes a shell command, with enhanced error handling for missing dependencies."""
+    run_dir = Path(cwd)
+
+    if force_overwrite:
+        scaffold_match = re.search(r'(create-react-app|vite|next|vue create)\s+([^\s]+)', command)
+        if scaffold_match:
+            target_path = run_dir / scaffold_match.group(2)
+            if target_path.exists():
+                shutil.rmtree(target_path)
     
-    generated_code = ""
-    async with AIService(session.config) as ai_service:
-        async for chunk in ai_service.stream_generate(request):
-            generated_code += chunk
-    
-    if not generated_code:
+    console.print(f"Running command: [bold magenta]{command}[/bold magenta] in [dim]{run_dir}[/dim]")
+
+    try:
+        process = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=run_dir
+        )
+        stdout, stderr = await process.communicate()
+
+        if process.returncode == 0:
+            console.print(f"[green]✓ Shell command finished successfully.[/green]")
+            if verbose and stdout:
+                console.print(Panel(stdout.decode().strip(), title="Output", border_style="dim"))
+            return True
+        else:
+            stderr_text = stderr.decode().strip()
+            stdout_text = stdout.decode().strip()
+            
+            # --- NEW: Smarter, Yes/No Dependency Installation ---
+            if 'command not found' in stderr_text.lower():
+                missing_cmd = command.split()[0]
+                
+                # Suggest a default install command based on OS
+                os_name = platform.system().lower()
+                install_suggestion = ""
+                if os_name == "darwin": # macOS
+                    install_suggestion = f"brew install {missing_cmd}"
+                    if missing_cmd == "mvn": install_suggestion = "brew install maven"
+                elif os_name == "linux":
+                    install_suggestion = f"sudo apt-get install -y {missing_cmd}"
+                    if missing_cmd == "mvn": install_suggestion = "sudo apt-get install -y maven"
+                
+                console.print(f"[yellow]Command '{missing_cmd}' not found.[/yellow]")
+                
+                if install_suggestion:
+                    proceed_install = await questionary.confirm(f"Attempt to install with: '{install_suggestion}'?").ask_async()
+                else:
+                    proceed_install = await questionary.confirm(f"Attempt to install '{missing_cmd}'? (You may need to find the correct command)").ask_async()
+
+                if proceed_install:
+                    final_install_command = install_suggestion
+                    # If we couldn't suggest a command, ask the user for it
+                    if not final_install_command:
+                        final_install_command = await questionary.text("Please enter the installation command:").ask_async()
+
+                    if not final_install_command:
+                        console.print("[yellow]Skipping command due to missing dependency.[/yellow]")
+                        return True # Gracefully skip
+
+                    console.print(f"Attempting to install with: [magenta]{final_install_command}[/magenta]")
+                    install_process = await asyncio.create_subprocess_shell(final_install_command, cwd=run_dir)
+                    if await install_process.wait() == 0:
+                        console.print(f"[green]✓ Installation successful. Retrying original command...[/green]")
+                        return await run_shell_command(session, command, cwd, can_fail, verbose, background)
+                    else:
+                        console.print(f"[red]Installation failed. Aborting step.[/red]")
+                        return False
+                else:
+                    console.print("[yellow]Skipping command due to missing dependency.[/yellow]")
+                    return True # Gracefully skip
+            
+            console.print("[bold red]Shell command failed. Output:[/bold red]")
+            if stdout_text: console.print(Text("[stdout] ", style="dim") + Text(stdout_text))
+            if stderr_text: console.print(Text("[stderr] ", style="dim") + Text(stderr_text))
+            return can_fail
+
+    except Exception as e:
+        console.print(f"[red]✗ An unexpected error occurred while running shell command: {e}[/red]")
         return False
+
+async def generate_code_concurrently(session, files: List[Dict[str, Any]], cwd: str = None) -> bool:
+    """Generates code for multiple files concurrently with a clean, dynamic progress bar."""
+    base_dir = Path(cwd) if cwd else session.config.work_dir
     
-    generated_code = generated_code.strip()
-    if generated_code.startswith("```"):
-        lines = generated_code.split('\n')
-        generated_code = '\n'.join(lines[1:-1]) if len(lines) > 2 and lines[-1].strip() == "```" else generated_code
-
-    session.last_ai_response_content = f"```{filename}\n{generated_code}\n```"
-    return await file_logic.save_code(session, filename)
-
-async def generate_code_concurrently(session, files: List[Dict[str, Any]]) -> bool:
-    """Generates code for multiple files concurrently using a robust runner pattern."""
-    progress = Progress(
-        SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
-        BarColumn(), TaskProgressColumn(), transient=True
-    )
-
-    async def _runner(base_coro, progress_id, filename: str) -> bool:
-        try:
-            success = await base_coro
-            progress.update(progress_id, completed=1, description=f"[green]✓ Wrote {filename}" if success else f"[red]✗ FAILED {filename}")
-            return success
-        except Exception as e:
-            progress.update(progress_id, completed=1, description=f"[red]✗ CRASHED {filename}")
-            console.print(f"[red]Error generating {filename}: {e}[/red]")
-            return False
+    progress = Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TaskProgressColumn(), console=console, transient=True)
 
     with progress:
-        runner_tasks = []
+        tasks = []
         for f in files:
-            filename, prompt = f['filename'], f['prompt']
-            base_task_coro = generate_code_for_file(session, filename, prompt)
-            progress_id = progress.add_task(f"Writing {filename}...", total=1)
-            runner_task = _runner(base_task_coro, progress_id, filename)
-            runner_tasks.append(runner_task)
+            filename, prompt = f.get('filename'), f.get('prompt')
+            if not filename or not prompt: continue
+            
+            progress_task_id = progress.add_task(f"[dim]Writing {filename}...[/dim]", total=1)
+            # Pass the base_dir to the file generation function
+            coro = generate_code_for_file(session, filename, prompt, base_dir)
+            tasks.append((asyncio.create_task(coro), progress_task_id, filename))
 
-        results = await asyncio.gather(*runner_tasks)
-
+        results = []
+        for task, progress_task_id, filename in tasks:
+            try:
+                success = await task
+                results.append(success)
+                style, icon = ("green", "✓") if success else ("red", "✗")
+                progress.update(progress_task_id, description=f"[{style}]{icon} Wrote {filename}[/{style}]", completed=1)
+            except Exception as e:
+                results.append(False)
+                progress.update(progress_task_id, description=f"[red]✗ CRASHED {filename}[/red]", completed=1)
+    
     return all(results)
 
 async def web_search(query: str, num_results: int = 5) -> str:
@@ -154,32 +217,17 @@ async def github_create_repo_non_interactive(session, repo_name: str, descriptio
         return False
 
 async def run_shell_command(session, command: str, cwd: str = None, can_fail: bool = False, verbose: bool = False, background: bool = False, force_overwrite: bool = False) -> bool:
-    work_dir = session.config.work_dir
-    run_dir = work_dir / (cwd or '.')
+    """Executes a shell command, with enhanced error handling for missing dependencies."""
+    run_dir = Path(cwd)
 
     if force_overwrite:
         scaffold_match = re.search(r'(create-react-app|vite|next|vue create)\s+([^\s]+)', command)
-        target_dir_name = None
         if scaffold_match:
-            target_dir_name = scaffold_match.group(2)
-        elif command.strip().startswith('mkdir'):
-             target_dir_name = command.strip().split(maxsplit=1)[1]
-
-        if target_dir_name:
-            target_path = run_dir / target_dir_name
+            target_path = run_dir / scaffold_match.group(2)
             if target_path.exists():
-                console.print(f"[yellow]Force overwrite enabled. Removing existing directory: {target_path}[/yellow]")
                 shutil.rmtree(target_path)
     
-    if cwd and not run_dir.exists():
-        run_dir.mkdir(parents=True, exist_ok=True)
-
-    console.print(f"Running command: [bold magenta]{command}[/bold magenta] in [dim]{run_dir}[/dim]")
-
-    server_keywords = ['uvicorn', 'npm start', 'npm run dev', 'yarn start', 'yarn dev', 'flask run', 'serve', 'next dev', 'vite']
-    if not background and any(keyword in command.lower() for keyword in server_keywords):
-        background = True
-        console.print(f"[yellow]Detected server command. Running in background mode.[/yellow]")
+    console.print(f"Running command: [bold red]{command}[/bold red] in [dim]{run_dir}[/dim]")
 
     try:
         process = await asyncio.create_subprocess_shell(
@@ -188,39 +236,53 @@ async def run_shell_command(session, command: str, cwd: str = None, can_fail: bo
             stderr=asyncio.subprocess.PIPE,
             cwd=run_dir
         )
-
-        if background:
-            session.background_processes = getattr(session, 'background_processes', [])
-            session.background_processes.append(process)
-            console.print(f"[green]✓ Command started in background (PID: {process.pid}).[/green]")
-            await asyncio.sleep(3)
-            return True
-
-        if not verbose:
-            with console.status(f"[dim]Executing...[/dim]", spinner="dots"):
-                stdout, stderr = await process.communicate()
-        else:
-            stdout, stderr = await process.communicate()
+        stdout, stderr = await process.communicate()
 
         if process.returncode == 0:
             console.print(f"[green]✓ Shell command finished successfully.[/green]")
+            if verbose and stdout:
+                console.print(Panel(stdout.decode().strip(), title="Output", border_style="dim"))
             return True
-        
-        stdout_text, stderr_text = stdout.decode().strip(), stderr.decode().strip()
-        
-        if 'already exists' in stderr_text.lower() or 'already up to date' in stderr_text.lower():
-            console.print(f"[yellow]✓ Resource already exists or is up to date. Continuing.[/yellow]")
-            return True
-
-        console.print("[bold red]Shell command failed. Output:[/bold red]")
-        if stdout_text: console.print(Text("[stdout] ", style="dim") + Text(stdout_text))
-        if stderr_text: console.print(Text("[stderr] ", style="dim") + Text(stderr_text))
+        else:
+            stderr_text = stderr.decode().strip()
+            stdout_text = stdout.decode().strip()
             
-        if can_fail:
-            console.print(f"[yellow]! Command failed but was marked as non-critical. Continuing.[/yellow]")
-            return True
-        
-        return False
+            if 'command not found' in stderr_text:
+                missing_cmd = command.split()[0]
+                console.print(f"[yellow]Command '{missing_cmd}' not found.[/yellow]")
+                
+                install_command = await questionary.text(
+                    f"Would you like to try installing it? (e.g., 'brew install {missing_cmd}', 'npm install -g {missing_cmd}'). Leave blank to skip."
+                ).ask_async()
+
+                if install_command:
+                    console.print(f"Attempting to install with: [magenta]{install_command}[/magenta]")
+                    install_process = await asyncio.create_subprocess_shell(
+                        install_command,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        cwd=run_dir
+                    )
+                    await install_process.wait()
+
+                    if install_process.returncode == 0:
+                        console.print(f"[green]✓ Installation successful. Retrying original command...[/green]")
+                        # Retry the original command
+                        return await run_shell_command(session, command, str(run_dir), can_fail, verbose, background)
+                    else:
+                        console.print(f"[red]Installation failed. Aborting step.[/red]")
+                        return False # Abort if install fails
+                else:
+                    console.print("[yellow]Skipping command due to missing dependency.[/yellow]")
+                    return True # Gracefully skip the step
+            
+            # Existing error handling
+            console.print("[bold red]Shell command failed. Output:[/bold red]")
+            if stdout_text: console.print(Text("[stdout] ", style="dim") + Text(stdout_text))
+            if stderr_text: console.print(Text("[stderr] ", style="dim") + Text(stderr_text))
+            
+            return can_fail
+
     except Exception as e:
         console.print(f"[red]✗ An unexpected error occurred while running shell command: {e}[/red]")
         return False
@@ -272,6 +334,11 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
             return False
 
 TOOL_REGISTRY = {
+    "create_project_workspace": {
+        "function": create_project_workspace,
+        "description": "Creates the main project directory. MUST be the first step for any new project plan.",
+        "parameters": { "directory_name": "string" }
+    },
     "run_shell_command": {
         "function": run_shell_command,
         "description": "Executes a shell command. Use for project setup, dependency installation, and running servers.",

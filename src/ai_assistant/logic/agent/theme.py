@@ -1,14 +1,10 @@
-# src/ai_assistant/logic/agent/theme.py
-
 class Theme:
     """Centralized color theme for the agent's UI components."""
-    HEADER = "bold orange1"
+    HEADER = "bold blue"
     GOAL = "italic"
-    PLAN_TITLE = "orange1"
-    STEP_PANEL_BORDER = "dim orange1"
-    STEP_HEADER = "bold"
-    REASONING = "dim"
+    SUMMARY_TITLE = "bold cyan"
+    SUMMARY_BORDER = "blue"
+    STEP_PANEL_BORDER = "dim cyan"
     SUCCESS = "green"
     PROMPT = "cyan"
     ERROR = "bold red"
-    ACTION_REASONING = "cyan"
