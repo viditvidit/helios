@@ -2,6 +2,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
+import asyncio
 
 from ..services.ai_service import AIService
 from ..models.request import CodeRequest
@@ -10,7 +11,8 @@ from ..utils.file_utils import build_repo_context
 console = Console()
 
 async def optimize_file(session, filename: str):
-    """Sends a file to the AI for optimization and returns the improved code."""
+    """Sends a file to the AI for optimization and returns the improved code.
+    This function is designed to be cancelled cleanly."""
     try:
         file_path = Path(filename)
         content = await session.file_service.read_file(file_path)

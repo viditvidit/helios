@@ -105,11 +105,18 @@ async def save_code(session, file_path_str: str, code_to_save: str = None):
         if not session.last_ai_response_content:
             console.print("[red]No AI response available to save from.[/red]")
             return False
+            
         code_blocks = extract_code_blocks(session.last_ai_response_content)
+        
+        # --- FIX FOR ISSUE #2 ---
+        # If no code blocks are found, assume the entire response is the file content.
+        # This is useful for saving text files like README.md where the AI might not use fences.
         if not code_blocks:
-            console.print("[red]No code blocks found in the last AI response.[/red]")
-            return False
-        code_to_save = code_blocks[0]['code']
+            console.print("[yellow]No code blocks found. Treating entire response as file content.[/yellow]")
+            code_to_save = session.last_ai_response_content
+        else:
+            # Default to saving the first code block if some are found.
+            code_to_save = code_blocks[0]['code']
 
     # The path is now a full path string provided by the caller
     path = Path(file_path_str)

@@ -109,13 +109,15 @@ class ChatHandler:
         response_content = ""
         
         try:
-            async with AIService(self.config) as ai_service:
-                with Live(Spinner("point", text="Thinking"), console=console, refresh_per_second=10, vertical_overflow="visible") as live:
-                    async for chunk in ai_service.stream_generate(request):
-                        if self._stop_generation:
-                            raise asyncio.CancelledError
-                        response_content += str(chunk)
-                        live.update(Markdown(response_content, code_theme="vim"))
+            markdown_renderable = Markdown("", code_theme="vim")
+            with Live(markdown_renderable, console=console, refresh_per_second=10, vertical_overflow="visible") as live:
+                with console.status("[dim]Thinking...[/dim]", spinner="point"):
+                    async with AIService(self.config) as ai_service:
+                        async for chunk in ai_service.stream_generate(request):
+                            if self._stop_generation:
+                                raise asyncio.CancelledError
+                            response_content += str(chunk)
+                            markdown_renderable.text = response_content
             
             self.session.last_ai_response_content = response_content
             self.session.conversation_history.append({"role": "assistant", "content": response_content})
@@ -147,7 +149,7 @@ class ChatHandler:
                             # Use build_repo_context to get all files in the directory
                             dir_context = build_repo_context(dir_path, self.config)
                             for file_path, content in dir_context.items():
-                                relative_path = str(file_path.relative_to(self.config.work_dir))
+                                relative_path = str(Path(file_path).relative_to(self.config.work_dir))
                                 mentioned_context[relative_path] = content
                         except Exception as e:
                             console.print(f"[yellow]Warning: Could not read directory {mention}: {e}[/yellow]")

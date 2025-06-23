@@ -1,3 +1,4 @@
+import asyncio
 import questionary
 from rich.console import Console
 from pathlib import Path
@@ -34,13 +35,30 @@ async def handle_index(session):
         session.current_files.update(file_contents)
 
 async def handle_optimize_file(session, filename: str):
-    """Handler for the /optimize command."""
-    if not filename: return console.print("[red]Usage: /optimize <filename>[/red]")
+    """Handler for the /optimize command with proper cancellation."""
+    if not filename:
+        return console.print("[red]Usage: /optimize <filename>[/red]")
+
+    # Create a cancellable task and assign it to the session's active task slot
+    task = asyncio.create_task(code_logic.optimize_file(session, filename))
+    session.chat_handler._generation_task = task
     
-    optimized_content = await code_logic.optimize_file(session, filename)
-    if optimized_content:
-        # Piggyback on the main chat handler's code review UI
-        await session.chat_handler._handle_code_response(optimized_content)
+    try:
+        with console.status(f"[cyan]Optimizing file: {filename}...[/cyan]", spinner="point", spinner_style="cyan"):
+            optimized_content = await task
+        
+        if optimized_content is not None:
+            # Piggyback on the main chat handler's code review UI
+            await session.chat_handler._handle_code_response(optimized_content)
+
+    except asyncio.CancelledError:
+        console.print("\n[yellow]Optimization cancelled by user.[/yellow]")
+    except Exception as e:
+        console.print(f"[red]An error occurred during file optimization: {e}[/red]")
+    finally:
+        # Ensure the task is cleared so the interrupt handler works correctly for the next operation
+        session.chat_handler._generation_task = None
+
 
 async def handle_scan(session):
     """Handler for the /scan command."""
