@@ -76,7 +76,7 @@ class Executor:
             current_step += 1
             step_title_text = Text(f"Step {current_step}/{total_steps}: ", style="") + Text(command_name, style="bold")
             step_json = json.dumps(step, indent=2)
-            console.print(Panel(Syntax(step_json, "json", theme="monokai"), title=step_title_text, border_style=Theme.STEP_PANEL_BORDER))
+            console.print(Panel(Syntax(step_json, "json", theme="vim"), title=step_title_text, border_style=Theme.STEP_PANEL_BORDER))
 
             action = await questionary.select("Action:", choices=["Execute", "Skip", "Edit", "Abort"]).ask_async()
 
