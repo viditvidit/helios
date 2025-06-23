@@ -8,10 +8,13 @@ from rich.spinner import Spinner
 from rich.markdown import Markdown
 from rich.syntax import Syntax
 import questionary
+
+import base64
+import mimetypes
 from typing import Optional
 
 from ...services.ai_service import AIService
-from ...models.request import CodeRequest
+from ...models.request import CodeRequest, ContentPart
 from ...utils.parsing_utils import extract_code_blocks
 from ...utils.file_utils import build_repo_context, FileUtils
 
@@ -219,8 +222,8 @@ class ChatHandler:
             has_file_paths = any(block.get('filepath') for block in code_blocks)
             
             if has_file_paths:
-                console.print("\n[yellow]💡 AI has suggested code changes.[/yellow]")
+                console.print("\n[yellow]AI has suggested code changes.[/yellow]")
                 console.print("[dim]Use /apply to review and apply changes, or /save <filename> to save manually.[/dim]")
                 # DO NOT automatically apply - let user decide
             else:
-                console.print("\n[dim]💡 Code generated. Use /save <filename> to save if needed.[/dim]")
+                console.print("\n[dim]Code generated. Use /save <filename> to save if needed.[/dim]")

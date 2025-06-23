@@ -11,7 +11,7 @@ from rich.text import Text
 
 from ..core.config import Config
 from ..core.exceptions import AIServiceError
-from ..models.request import CodeRequest
+from ..models.request import CodeRequest, ContentPart
 from ..utils.parsing_utils import build_file_tree
 
 

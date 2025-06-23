@@ -5,6 +5,12 @@ from dataclasses import dataclass, field
 from typing import Dict, List
 
 @dataclass
+class ContentPart:
+    type: str
+    content: str
+    mime_type: str = "text/plain"
+
+@dataclass
 class CodeRequest:
     """
     Request model for code generation and modification.
