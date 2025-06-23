@@ -1,10 +1,9 @@
-"""
-Configuration management for AI Code Assistant
-"""
+# src/ai_assistant/core/config.py
+
 import os
 from pathlib import Path
 from typing import Optional, Dict, List
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, MISSING
 import yaml
 from dotenv import load_dotenv
 
@@ -16,16 +15,18 @@ try:
 except Exception:
     PROJECT_ROOT = Path.cwd()
 
-
 @dataclass
 class ModelConfig:
+    # --- FIX: Reordered fields and RESTORED your default values ---
+    # Required fields (must be in YAML)
     name: str
-    type: str 
-    endpoint: str
+    provider: str
     context_length: int
     temperature: float
-    system_prompt: str
-    agent_instructions: str
+    # Optional fields (will use these defaults if not in YAML)
+    endpoint: Optional[str] = None
+    system_prompt: str = ""
+    agent_instructions: str = ""
     api_key: Optional[str] = None
     max_tokens: int = 80000
     timeout: int = 1200
@@ -39,29 +40,27 @@ class GitHubConfig:
 @dataclass
 class Config:
     """Main configuration class"""
+    config_path: Optional[Path] = None
     model_name: str = field(init=False)
+    default_model: str = field(init=False)
     models: Dict[str, ModelConfig] = field(default_factory=dict)
     github: GitHubConfig = field(default_factory=GitHubConfig)
     work_dir: Path = field(default_factory=Path.cwd)
-    max_file_size: int = 1024 * 1024  # 1MB
-    supported_extensions: List[str] = field(default_factory=lambda: [])
+    max_file_size: int = 1024 * 1024
+    supported_extensions: List[str] = field(default_factory=list)
 
-    def __init__(self, config_path: Optional[Path] = None):
-        # Manually initialize fields because we are overriding the dataclass __init__
-        self.work_dir = Path.cwd()
-        self.max_file_size = 1024 * 1024
+    def __post_init__(self):
+        """Post-initialization logic to load configs."""
         self.supported_extensions = [
             '.py', '.js', '.ts', '.java', '.cpp', '.c', '.go', '.rs', '.rb',
             '.html', '.css', '.scss', '.json', '.yaml', '.yml', '.md', '.txt',
             'Dockerfile', '.sh', '.toml', '.ini', '.cfg'
         ]
-        self.github = GitHubConfig()
-        self.models = {}
-
+        
         load_dotenv()
         self._load_from_env()
 
-        models_config_path = PROJECT_ROOT / "configs/models.yaml"
+        models_config_path = self.config_path or PROJECT_ROOT / "configs/models.yaml"
         if not models_config_path.exists():
             models_config_path = Path.cwd() / "configs/models.yaml"
 
@@ -78,7 +77,7 @@ class Config:
         self.github.username = os.getenv('GITHUB_USERNAME')
 
     def _load_models_from_file(self, path: Path):
-        """Load models configuration from YAML file."""
+        """Load and process models configuration from YAML file."""
         try:
             with open(path) as f:
                 data = yaml.safe_load(f)
@@ -87,25 +86,63 @@ class Config:
             if not self.default_model:
                 raise ConfigurationError("'default_model' not specified in models.yaml")
 
+            common_ollama = data.get('common_ollama', {})
+            common_gemini = data.get('common_gemini', {})
+
             for name, config in data.get("models", {}).items():
-                self.models[name] = ModelConfig(**config)
+                provider = config.get('provider')
+                # Infer provider based on common settings block used by YAML anchor
+                if not provider:
+                    if '<<' in config and config['<<'] == '*common_gemini_settings':
+                        provider = 'gemini'
+                    else:
+                        provider = 'ollama'
+                
+                final_config = {}
+                if provider == 'ollama':
+                    final_config = {**common_ollama, **config}
+                elif provider == 'gemini':
+                    final_config = {**common_gemini, **config}
+                
+                api_key = None
+                if provider == 'gemini':
+                    api_key = os.getenv("GOOGLE_API_KEY")
+                    if not api_key:
+                        raise ConfigurationError(f"Model '{name}' is a Gemini model but GOOGLE_API_KEY is not set.")
 
-            if not self.models:
-                raise ConfigurationError("No models defined in models.yaml")
+                # --- FIX: Correctly extract dataclass defaults ---
+                dataclass_defaults = {
+                    f.name: f.default for f in ModelConfig.__dataclass_fields__.values() 
+                    if f.default is not MISSING and not isinstance(f.default, type(field()))
+                }
+
+                self.models[name] = ModelConfig(
+                    # Required fields from YAML
+                    name=final_config['name'],
+                    provider=final_config['provider'],
+                    context_length=int(final_config['context_length']),
+                    temperature=float(final_config['temperature']),
+                    # Optional fields from YAML with fallback to dataclass defaults
+                    endpoint=final_config.get('endpoint'),
+                    system_prompt=final_config.get('system_prompt', dataclass_defaults.get('system_prompt', '')),
+                    agent_instructions=final_config.get('agent_instructions', dataclass_defaults.get('agent_instructions', '')),
+                    api_key=api_key,
+                    max_tokens=int(final_config.get('max_tokens', dataclass_defaults.get('max_tokens', 80000))),
+                    timeout=int(final_config.get('timeout', dataclass_defaults.get('timeout', 1200)))
+                )
+
             if self.default_model not in self.models:
-                raise ConfigurationError(f"Default model '{self.default_model}' is not defined in the 'models' section.")
+                raise ConfigurationError(f"Default model '{self.default_model}' is not defined.")
 
-        except (yaml.YAMLError, TypeError, KeyError) as e:
-            raise ConfigurationError(f"Error parsing models config file {path}: {e}")
+        except KeyError as e:
+            raise ConfigurationError(f"Missing required key {e} in models.yaml for a model.")
+        except Exception as e:
+            raise ConfigurationError(f"Error processing models config file {path}: {e}")
 
     def get_current_model(self) -> ModelConfig:
-        """Get the currently selected model configuration."""
-        if self.model_name not in self.models:
-            raise ConfigurationError(f"Model '{self.model_name}' not found in configuration.")
         return self.models[self.model_name]
 
     def set_model(self, model_name: str):
-        """Override the currently selected model."""
         if model_name not in self.models:
             raise ConfigurationError(f"Model '{model_name}' not found. Available: {', '.join(self.models.keys())}")
         self.model_name = model_name

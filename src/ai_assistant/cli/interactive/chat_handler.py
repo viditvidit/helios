@@ -115,13 +115,14 @@ class ChatHandler:
                         if self._stop_generation:
                             raise asyncio.CancelledError
                         response_content += str(chunk)
-                        live.update(Markdown(response_content, code_theme="vim"))
+                        # Only update the Live display with the new chunk
+                        live.update(Markdown(chunk, code_theme="vim"))
             
             self.session.last_ai_response_content = response_content
             self.session.conversation_history.append({"role": "assistant", "content": response_content})
             await self._handle_code_response(response_content)
         except asyncio.CancelledError:
-            # Don't print a message here, the stop_generation method does it.
+             # This is expected when Ctrl+C is pressed, so we can ignore it here.
             pass
         except Exception as e:
             console.print(f"[bold red]Error during response generation: {e}[/bold red]")
