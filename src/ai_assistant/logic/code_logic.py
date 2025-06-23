@@ -11,7 +11,6 @@ console = Console()
 
 async def optimize_file(session, filename: str):
     """Sends a file to the AI for optimization and returns the improved code."""
-    console.print(f"[cyan]Optimizing file: {filename}...[/cyan]")
     try:
         file_path = Path(filename)
         content = await session.file_service.read_file(file_path)
@@ -26,9 +25,14 @@ async def optimize_file(session, filename: str):
         request = CodeRequest(prompt=prompt, files={filename: content})
         
         optimized_code = ""
-        async with AIService(session.config) as ai_service:
-            async for chunk in ai_service.stream_generate(request):
-                optimized_code += chunk
+        try:
+            with console.status(f"[cyan]Optimizing file: {filename}...[/cyan]", spinner="point", spinner_style="cyan"):
+                async with AIService(session.config) as ai_service:
+                    async for chunk in ai_service.stream_generate(request):
+                        optimized_code += chunk
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Optimization cancelled by user.[/yellow]")
+            return None
         
         return optimized_code
         
@@ -65,9 +69,13 @@ async def scan_repository(session):
     request = CodeRequest(prompt=prompt, files={"repository_context": file_contents_str})
     
     report = ""
-    with console.status("[bold yellow]AI is reviewing your code...[/bold yellow]"):
-        async with AIService(session.config) as ai_service:
-            async for chunk in ai_service.stream_generate(request):
-                report += chunk
+    try:
+        with console.status("[bold yellow]AI is reviewing your code...[/bold yellow]", spinner="point", spinner_style="yellow"):
+            async with AIService(session.config) as ai_service:
+                async for chunk in ai_service.stream_generate(request):
+                    report += chunk
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Repository scan cancelled by user.[/yellow]")
+        return
                 
     console.print(Panel(Syntax(report, "markdown", theme="github-dark"), title="Repository Scan Report", border_style="blue"))

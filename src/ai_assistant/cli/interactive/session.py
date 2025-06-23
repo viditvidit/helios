@@ -8,8 +8,6 @@ from rich.console import Console
 import questionary
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion, FuzzyCompleter
-from prompt_toolkit.formatted_text import StyleAndTextTuples
-from prompt_toolkit.auto_suggest import AutoSuggestFromHistory, Suggestion
 from prompt_toolkit.styles import Style
 
 from .command_handler import CommandHandler
