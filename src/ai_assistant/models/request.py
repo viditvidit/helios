@@ -18,7 +18,7 @@ class CodeRequest:
     This class encapsulates all the information needed for the AI service to process a code-related request.
     It includes the user's prompt, any relevant files, Git context, instructions, and conversation history.
     """
-    prompt: str  # The main request from the user.
+    prompt: List[ContentPart]
     files: Dict[str, str] = field(default_factory=dict)  # A dictionary of file paths and their content from RAG.
     repository_files: List[str] = field(default_factory=list) # A list of all file paths in the repo for structural context.
     git_context: str = ""  # Information about the current Git repository state.

@@ -31,7 +31,6 @@ class ChatHandler:
         self._stop_generation = True
         if self._generation_task and not self._generation_task.done():
             self._generation_task.cancel()
-            console.print("\n[yellow]Stopping generation...[/yellow]")
 
     async def _find_file_in_project(self, filename: str) -> Optional[Path]:
         """Searches for a file in the project directory."""
@@ -104,6 +103,41 @@ class ChatHandler:
             except Exception as e:
                 console.print(f"[red]Error applying changes to {filename}: {e}[/red]")
 
+    async def _process_input_to_content_parts(self, message: str) -> list[ContentPart]:
+        """
+        Processes user input string into a list of ContentParts.
+        Recognizes local file paths as images and text as text.
+        """
+        parts = []
+        tokens = message.split()
+        text_buffer = []
+
+        for token in tokens:
+            path = Path(token).expanduser()
+            if path.is_file():
+                if text_buffer:
+                    parts.append(ContentPart(type='text', content=" ".join(text_buffer)))
+                    text_buffer = []
+                
+                mime_type, _ = mimetypes.guess_type(path)
+                if mime_type and mime_type.startswith('image/'):
+                    console.print(f"[dim]Processing image: {path.name}[/dim]")
+                    try:
+                        with open(path, "rb") as image_file:
+                            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                        parts.append(ContentPart(type='image', content=encoded_string, mime_type=mime_type))
+                    except Exception as e:
+                        console.print(f"[red]Error reading image file {path}: {e}[/red]")
+                else: # It's a file but not an image, treat as a text token
+                    text_buffer.append(token)
+            else:
+                text_buffer.append(token)
+        
+        if text_buffer:
+            parts.append(ContentPart(type='text', content=" ".join(text_buffer)))
+        
+        return parts
+
     async def _stream_and_process_response(self, request: CodeRequest):
         """
         A dedicated coroutine to wrap the async generator and handle the streaming logic.
@@ -118,7 +152,11 @@ class ChatHandler:
                         if self._stop_generation:
                             raise asyncio.CancelledError
                         response_content += str(chunk)
+                        # Only update the live display, don't create new panels
                         live.update(Markdown(response_content, code_theme="vim"))
+                
+                # Print the final response after streaming is complete
+                console.print(Markdown(response_content, code_theme="vim"))
             
             self.session.last_ai_response_content = response_content
             self.session.conversation_history.append({"role": "assistant", "content": response_content})
@@ -134,13 +172,32 @@ class ChatHandler:
         """Main message handler with corrected @mention and AIService usage."""
         try:
             self._stop_generation = False
+
+            prompt_parts = await self._process_input_to_content_parts(message)
+            if not prompt_parts: return
+
+            has_image = any(p.type == 'image' for p in prompt_parts)
+            current_model_name = self.config.get_current_model().name
+            # A simple check, assuming vision models have 'llava' or 'vision' in their name.
+            # This should be made more robust in a real application.
+            is_vision_model = 'llava' in current_model_name or 'vision' in current_model_name
+            
+            if has_image and not is_vision_model:
+                console.print(Panel(
+                    f"[yellow]Warning:[/yellow] An image was provided, but the current model ([bold]{current_model_name}[/bold]) may not be able to process it.\n"
+                    "For best results, consider switching to a multimodal model (e.g., one with 'llava' in the name) using the `/model` command.",
+                    border_style="yellow",
+                    title="Model Capability Warning"
+                ))
+
+            text_for_history_and_rag = " ".join([p.content for p in prompt_parts if p.type == 'text'])
+            session.conversation_history.append({"role": "user", "content": text_for_history_and_rag})
             
             # --- Robust @mention Logic with File Finder ---
             mentioned_context = {}
             mentions = re.findall(r'@([^\s]+)', message)
             
             if mentions:
-                console.print("[dim]Processing @mentions...[/dim]")
                 for mention in mentions:
                     # First check if it's a directory path
                     dir_path = self.config.work_dir / mention
@@ -192,19 +249,16 @@ class ChatHandler:
             session.conversation_history.append({"role": "user", "content": message})
             
             request = CodeRequest(
-                prompt=message,
+                prompt=prompt_parts,
                 files=final_context,
                 repository_files=list(session.current_files.keys()),
                 conversation_history=session.conversation_history.copy(),
             )
 
-            # --- DEFINITIVE FIX for asyncio TypeError ---
-            # Create a task for the wrapper coroutine, not the generator itself.
             self._generation_task = asyncio.create_task(self._stream_and_process_response(request))
             await self._generation_task
 
         except asyncio.CancelledError:
-             # This is expected when Ctrl+C is pressed, so we can ignore it here.
             pass
         except Exception as e:
             console.print(f"[bold red]Error handling chat message: {e}[/bold red]")
