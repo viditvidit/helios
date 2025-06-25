@@ -128,15 +128,24 @@ class Executor:
                 tool_func = self.tools[command_name]['function']
                 sig = inspect.signature(tool_func)
                 
-                # Always pass the session object
+                # Always pass the session object if expected
                 if 'session' in sig.parameters:
                     args['session'] = self.session
 
-                # Override `cwd` for `run_shell_command` with the session's current work_dir
+                # Override `cwd` for commands that need it with the session's current work_dir
                 if command_name == "run_shell_command" or command_name == "generate_code_concurrently":
                      args['cwd'] = str(self.session.work_dir)
 
-                success = await tool_func(**args)
+                # Filter args to only include parameters that the function actually accepts
+                valid_params = set(sig.parameters.keys())
+                filtered_args = {k: v for k, v in args.items() if k in valid_params}
+                
+                # Log filtered parameters for debugging
+                if len(args) != len(filtered_args):
+                    ignored_params = set(args.keys()) - valid_params
+                    console.print(f"[dim]Ignoring unsupported parameters for {command_name}: {ignored_params}[/dim]")
+
+                success = await tool_func(**filtered_args)
 
                 if not success:
                     error_title = Text("Execution Failed", style=Theme.ERROR)

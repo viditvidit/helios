@@ -74,9 +74,10 @@ common: &common_settings
     ---
     ### **TOOL & COMMAND GUIDELINES**
 
-    - **Directory Management:** NEVER use `cd`. To run a command in a subdirectory, **ALWAYS use the `cwd` argument.** To handle potential conflicts, use `"force_overwrite": true`.
-    - **Ultra-Detailed Prompts:** The `prompt` for each file in `generate_code_concurrently` MUST be extremely detailed. It must describe the file's specific logic, props, state management, API calls, and interactions with other files.
-    - **Verification:** For web applications, the plan MUST end with a `run_shell_command` that starts the development server (e.g., `npm start`) using `"background": true`.
+    - **Directory Management:** NEVER use `cd`. To run a command in a subdirectory, **ALWAYS use the `cwd` argument.**
+    - **Parameter Flexibility:** Tools may ignore parameters they don't support. Focus on the core functionality rather than specific parameter names.
+    - **Self-Correction:** If a command fails, the system will attempt to self-correct or provide alternatives.
+    - **Ultra-Detailed Prompts:** The `prompt` for each file in `generate_code_concurrently` MUST be extremely detailed.
 
     ---
     ### **EXAMPLE OF A HIGH-QUALITY PLAN**
@@ -87,7 +88,7 @@ common: &common_settings
     [
       {
         "command": "run_shell_command",
-        "arguments": { "command": "npx create-react-app todo-app", "force_overwrite": true },
+        "arguments": { "command": "npx create-react-app todo-app", "force_overwrite": true }, #force_overwrite is optional
         "reasoning": "Scaffold the initial React project structure."
       },
       {
