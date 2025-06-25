@@ -30,6 +30,7 @@ class Planner:
         prompt_lines = []
         for name, tool in self.tools.items():
             params = tool.get('parameters', {})
+            # Exclude session from the prompt as the AI doesn't need to know about it
             params_for_ai = {k: v for k, v in params.items() if k not in ['session', 'config']}
             param_str = ", ".join([f"{k}: {v}" for k, v in params_for_ai.items()])
             prompt_lines.append(f"- `{name}({param_str})`: {tool['description']}")
@@ -78,10 +79,16 @@ class Planner:
         if not agent_instructions:
              console.print(f"[{Theme.ERROR}]Error: Agent instructions are not defined in models.yaml.[/{Theme.ERROR}]")
              return None
-
+        
+        # --- THE FIX: Universal, principle-based rules ---
         final_prompt = (
             f"{base_system_prompt}\n\n"
             f"## Agentic Mode Instructions\n{agent_instructions}\n\n"
+            "### Important Planning Principles:\n"
+            "1.  **Research First:** For any technology or library you are unsure about, use `web_search` to find best practices or official documentation before generating code.\n"
+            "2.  **Directory Awareness:** Always be mindful of the current working directory (`cwd`). Use `create_project_workspace` to establish the root project folder. For all subsequent file operations or shell commands, ensure the `cwd` argument is set correctly to operate in the right location.\n"
+            "3.  **Project Initialization Strategy:** When using a command-line tool to scaffold a new project, recognize that such tools often create their own project directory. To avoid creating redundant nested folders (e.g., `my-app/my-app`), you should typically run the scaffolding command in a parent directory and let it create the final project folder. **Do not** use `create_project_workspace` to create a directory that a scaffolding tool will then also create.\n"
+            "4.  **Be Methodical:** Deconstruct the goal into small, logical steps. For example: create workspace -> install dependencies -> generate code -> run build/test.\n\n"
             f"### Available Tools\n{formatted_tools}\n\n"
             f"---\n"
             f"**User Request:** {goal}"

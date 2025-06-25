@@ -2,7 +2,7 @@
 
 import inspect
 import json
-from typing import List, Any
+from typing import List, Any, Tuple
 import copy
 
 import questionary
@@ -23,7 +23,8 @@ console = Console()
 class Executor:
     def __init__(self, session):
         self.session = session
-        self.work_dir = self.session.config.work_dir
+        # The work_dir is now a mutable attribute of the session, set by tools
+        self.session.work_dir = self.session.config.work_dir
         self.tools = TOOL_REGISTRY
 
     async def _summarize_plan_with_ai(self, plan: List[Any], goal: str) -> str:
@@ -45,6 +46,35 @@ class Executor:
             async for chunk in ai_service.stream_generate(request):
                 summary += chunk
         return summary.strip()
+        
+    def _render_step_for_display(self, step: dict[str, Any]) -> Tuple[str, str]:
+        """
+        Translates an execution step into a human-readable format for display.
+        Returns a tuple of (action_description, reasoning_text).
+        """
+        command = step.get("command", "unknown_command")
+        args = step.get("arguments", {})
+        reasoning = step.get("reasoning", "No reasoning provided.")
+        
+        action_text = f"[bold yellow]Executing Tool:[/bold yellow] [dim]{command}[/dim]" # Fallback
+
+        if command == "create_project_workspace":
+            action_text = f"[bold cyan]mkdir[/bold cyan] [green]{args.get('directory_name', '')}[/green]"
+        elif command == "run_shell_command":
+            action_text = f"[bold cyan]$[/bold cyan] [green]{args.get('command', '')}[/green]"
+        elif command == "generate_code_concurrently":
+            count = len(args.get('files', []))
+            action_text = f"[bold cyan]Generating {count} file(s)...[/bold cyan]"
+        elif command == "review_and_commit_changes":
+            action_text = f"[bold cyan]git commit -m[/bold cyan] [green]\"{args.get('commit_message', '')}\"[/green]"
+        elif command == "setup_git_and_push":
+            action_text = f"[bold cyan]Initializing Git and pushing to new repo...[/bold cyan]"
+        elif command == "web_search":
+             action_text = f"[bold cyan]Searching web:[/bold cyan] [green]\"{args.get('query', '')}\"[/green]"
+        elif command == "fetch_web_content":
+            action_text = f"[bold cyan]Fetching content from URL...[/bold cyan]"
+
+        return action_text, reasoning
 
     async def execute_plan(self, plan: List[Any], goal: str) -> None:
         summary = await self._summarize_plan_with_ai(plan, goal)
@@ -74,19 +104,23 @@ class Executor:
                 break
 
             current_step += 1
-            step_title_text = Text(f"Step {current_step}/{total_steps}: ", style="") + Text(command_name, style="bold")
-            step_json = json.dumps(step, indent=2)
-            console.print(Panel(Syntax(step_json, "json", theme="monokai"), title=step_title_text, border_style=Theme.STEP_PANEL_BORDER))
+            step_title_text = Text(f"Step {current_step}/{total_steps}", style="")
+
+            # --- RENDER THE ABSTRACTED VIEW ---
+            action_str, reasoning_str = self._render_step_for_display(step)
+            display_content = f"{action_str}\n\n[bold]Reasoning:[/bold] [dim]{reasoning_str}[/dim]"
+            console.print(Panel(display_content, title=step_title_text, border_style=Theme.STEP_PANEL_BORDER, expand=False))
 
             action = await questionary.select("Action:", choices=["Execute", "Skip", "Edit", "Abort"]).ask_async()
 
             if action == "Abort": return
             if action == "Skip": continue
             if action == "Edit":
-                edited_json_str = await questionary.text("Edit step:", multiline=True, default=step_json).ask_async()
+                step_json = json.dumps(step, indent=2)
+                edited_json_str = await questionary.text("Edit step JSON:", multiline=True, default=step_json).ask_async()
                 try:
                     step = json.loads(edited_json_str or "{}")
-                    command_name = step.get("command")
+                    command_name = step.get("command") # Re-read command name after edit
                 except json.JSONDecodeError: continue
 
             args = step.get("arguments", {})
@@ -94,24 +128,19 @@ class Executor:
                 tool_func = self.tools[command_name]['function']
                 sig = inspect.signature(tool_func)
                 
+                # Always pass the session object
                 if 'session' in sig.parameters:
                     args['session'] = self.session
 
-                if command_name == "create_project_workspace":
-                    dir_name = args.get("directory_name")
-                    await tool_func(**args)
-                    if dir_name:
-                        self.work_dir = self.session.config.work_dir / dir_name
-                        console.print(f"[dim]Workspace for all subsequent steps set to: ./{dir_name}[/dim]")
-                    success = True
-                else:
-                    if 'cwd' in sig.parameters:
-                        args['cwd'] = str(self.work_dir)
-                    success = await tool_func(**args)
+                # Override `cwd` for `run_shell_command` with the session's current work_dir
+                if command_name == "run_shell_command" or command_name == "generate_code_concurrently":
+                     args['cwd'] = str(self.session.work_dir)
+
+                success = await tool_func(**args)
 
                 if not success:
                     error_title = Text("Execution Failed", style=Theme.ERROR)
-                    console.print(Panel(f"Step '{command_name}' failed. Aborting plan.", border_style=Theme.ERROR, title=error_title))
+                    console.print(Panel(f"Step failed. Aborting plan.", border_style=Theme.ERROR, title=error_title))
                     return
             else:
                 unknown_cmd_title = Text("Unknown Command", style=Theme.ERROR)
