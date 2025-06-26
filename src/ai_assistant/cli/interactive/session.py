@@ -1,3 +1,5 @@
+# src/ai_assistant/cli/interactive/session.py
+
 import os
 import asyncio
 import signal
@@ -12,6 +14,7 @@ from prompt_toolkit.styles import Style
 
 from .command_handler import CommandHandler
 from .chat_handler import ChatHandler
+from .orchestrator import Orchestrator 
 from . import display
 from ...core.config import Config
 from ...services.file_service import FileService
@@ -22,47 +25,22 @@ from ...utils.git_utils import GitUtils
 
 console = Console()
 
-# --- NEW: Custom Completer for file paths ---
 class FilePathCompleter(Completer):
     def __init__(self, session):
-        self.session = session  # Reference to session for dynamic file list
+        self.session = session
     
     def get_completions(self, document, complete_event) -> Iterable[Completion]:
-        """Yields all possible file paths for the fuzzy completer to filter."""
         text_before_cursor = document.text_before_cursor
-        
-        # Only trigger if there's an '@' and no space after it yet
         if '@' in text_before_cursor:
             word_before_cursor = document.get_word_before_cursor(WORD=True)
             if word_before_cursor.startswith('@'):
-                # The word we are completing is after the '@'
                 search_text = word_before_cursor[1:]
-                # Get current file list dynamically from session
                 current_files = sorted(list(set(self.session.current_files.keys())))
                 for path in current_files:
-                    yield Completion(
-                        path,
-                        start_position=-len(search_text),
-                        display=path
-                    )
-
-    '''def get_completions(self, document, complete_event):
-        """Return completions for file paths when @ symbol is used."""
-        text = document.text
-        if '@' in text:
-            at_pos = text.rfind('@')
-            search_text = text[at_pos + 1:]
-            
-            for file_path in self.file_list:
-                if file_path.lower().startswith(search_text.lower()):
-                    yield Completion(
-                        file_path,
-                        start_position=-len(search_text),
-                        display=file_path
-                    )'''
+                    # A basic substring check for completion
+                    if search_text.lower() in path.lower():
+                        yield Completion(path, start_position=-len(search_text))
     
-        
-
 class InteractiveSession:
     """Manages the state and main loop for an interactive chat session."""
     def __init__(self, config: Config):
@@ -75,6 +53,7 @@ class InteractiveSession:
         self.last_ai_response_content: Optional[str] = None
         self.command_handler = CommandHandler(self)
         self.chat_handler = ChatHandler(self)
+        self.orchestrator = Orchestrator(self)
         signal.signal(signal.SIGINT, self._handle_interrupt)
 
     def _handle_interrupt(self, signum, frame):
@@ -88,7 +67,6 @@ class InteractiveSession:
         if helios_dir.exists():
             console.print(f"[dim]Using existing project root: {Path.cwd()}[/dim]")
             return
-        console.print("[yellow]Helios project not initialized in this directory.[/yellow]")
         if await questionary.confirm(f"Initialize project in current directory? ({Path.cwd()})", default=True, auto_enter=False).ask_async():
             if not await GitUtils().is_git_repo(Path.cwd()):
                 if await questionary.confirm("This directory is not a Git repository. Initialize one now?", default=True, auto_enter=False).ask_async():
@@ -110,19 +88,13 @@ class InteractiveSession:
         
         display.show_welcome()
 
-        # --- NEW: Setup prompt_toolkit session with custom styles and fuzzy completer ---
-        # Create a completer that gets file list dynamically from session
-        file_completer = FilePathCompleter(self)  # Pass session instead of static file list
+        file_completer = FilePathCompleter(self)
         fuzzy_file_completer = FuzzyCompleter(file_completer)
-
-        # Custom styles for the autocomplete menu
         style = Style.from_dict({
-            'completion-menu.completion.current': 'bg:#333333 #ffffff', # Selected item
-            'completion-menu.completion': 'bg:#1a1a1a #666666',      # Other items
-            'completion-menu.meta.completion.current': 'bg:#333333 #cccccc',
-            'completion-menu.meta.completion': 'bg:#1a1a1a #444444',
-            '': '#00d7ff bold',  # Default text color (cyan, bold)
-            'prompt': '#ffffff bold',  # Prompt symbol color
+            'completion-menu.completion.current': 'bg:#333333 #ffffff',
+            'completion-menu.completion': 'bg:#1a1a1a #666666',
+            '': '#00d7ff bold',
+            'prompt': '#ffffff bold',
         })
 
         prompt_session = PromptSession(
@@ -130,7 +102,7 @@ class InteractiveSession:
             completer=fuzzy_file_completer,
             complete_while_typing=True,
             style=style,
-            input_processors=[],
+            input_processors=[]
         )
 
         while True:
@@ -139,19 +111,20 @@ class InteractiveSession:
                 user_input = await prompt_session.prompt_async("> ")
                 
                 if not user_input.strip(): continue
-                if user_input.lower() in ['exit', 'quit', 'bye']: display.show_goodbye(); break
+                if user_input.lower() in ['exit', 'quit', 'bye']: 
+                    display.show_goodbye()
+                    break
                 
-                if user_input.startswith('/'):
-                    await self.command_handler.handle(user_input)
-                else:
-                    await self.chat_handler.handle(user_input, self)
+                # --- FIX 3: Correct the call to orchestrator.handle ---
+                # It no longer needs the session passed as it's part of the instance
+                await self.orchestrator.handle(user_input)
 
             except KeyboardInterrupt:
-                # This is triggered by our custom signal handler
-                console.print("") # Newline after prompt
+                console.print("") 
                 continue 
             except EOFError:
-                display.show_goodbye(); break
+                display.show_goodbye()
+                break
             except Exception as e:
                 console.print(f"[red]Unexpected error: {e}[/red]")
                 import traceback
