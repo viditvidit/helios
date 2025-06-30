@@ -1,5 +1,8 @@
+# src/ai_assistant/cli/interactive/chat_handler.py
+
 import asyncio
 import re
+import json
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
@@ -14,6 +17,8 @@ from ...services.ai_service import AIService
 from ...models.request import CodeRequest
 from ...utils.parsing_utils import extract_code_blocks
 from ...utils.file_utils import build_repo_context, FileUtils
+from ...logic.agent.planner import Planner
+from ...logic.agent import agent_main
 
 console = Console()
 
@@ -47,6 +52,58 @@ class ChatHandler:
             except Exception:
                 return None # User cancelled
         return None
+
+    async def _classify_intent(self, message: str) -> dict:
+        """Uses an AI call to classify the user's intent."""
+        
+        planner = Planner(self.session)
+        formatted_tools = planner._format_tools_for_prompt()
+
+        intent_prompt = (
+            "You are an intent detection expert for a command-line AI assistant. "
+            "Your task is to determine if a user's request can be handled by a simple chat response or if it requires a complex, multi-step execution plan using a set of available tools. "
+            "A complex task involves actions like creating/modifying files, running shell commands, or interacting with git.\n\n"
+            "**Available Tools:**\n"
+            f"{formatted_tools}\n\n"
+            "**User Request:**\n"
+            f'"{message}"\n\n'
+            "**Analysis:**\n"
+            "1.  **Simple Chat:** The request is a question, a request for explanation, a simple code generation for a single file without saving it, or a general conversation. It can be answered in one go.\n"
+            "2.  **Complex Task:** The request implies a sequence of actions. It mentions creating directories, running installers (like npm or pip), generating multiple files and saving them, committing to git, pushing to GitHub, or a combination of these. If the user asks to 'create a project', 'refactor this into a new structure', 'set up a new service', or 'modularize this code', it's a complex task.\n\n"
+            "Based on your analysis, respond with ONLY a JSON object with one of two formats:\n"
+            '1. For a simple chat: `{"intent": "simple_chat"}`\n'
+            '2. For a complex task: `{"intent": "complex_task"}`\n'
+            "Your JSON response:"
+        )
+        
+        request = CodeRequest(prompt=intent_prompt)
+        response_json_str = ""
+        try:
+            async with AIService(self.config) as ai_service:
+                async for chunk in ai_service.stream_generate(request):
+                    response_json_str += chunk
+            
+            # The AI might add markdown fences or other text. Find the JSON object.
+            match = re.search(r'```json\s*(\{.*?\})\s*```', response_json_str, re.DOTALL)
+            json_text = ""
+            if match:
+                json_text = match.group(1)
+            else:
+                # If no markdown fence, find the first '{' and last '}'
+                start = response_json_str.find('{')
+                end = response_json_str.rfind('}')
+                if start != -1 and end != -1:
+                    json_text = response_json_str[start:end+1]
+            
+            if json_text:
+                return json.loads(json_text)
+            else:
+                raise json.JSONDecodeError("No JSON object found", response_json_str, 0)
+
+        except (json.JSONDecodeError, TypeError):
+            # Default to simple_chat if parsing fails, which is a safe fallback.
+            console.print("[dim]Intent classification failed. Defaulting to chat mode.[/dim]")
+            return {"intent": "simple_chat"}
 
     async def _handle_code_response(self, response_content: str):
         """Interactively handles code blocks in the AI's response."""
@@ -130,9 +187,21 @@ class ChatHandler:
 
 
     async def handle(self, message: str, session):
-        """Main message handler with corrected @mention and AIService usage."""
+        """Main message handler with intent detection."""
         try:
             self._stop_generation = False
+            
+            # --- INTENT DETECTION ---
+            with console.status("[dim]Analyzing request...[/dim]"):
+                intent_result = await self._classify_intent(message)
+            intent = intent_result.get("intent")
+
+            if intent == "complex_task":
+                console.print("\n[bold cyan]Complex task detected. Engaging agent...[/bold cyan]\n")
+                await agent_main.run_agentic_workflow(session, message, interactive=False)
+                return
+
+            # --- REGULAR CHAT FLOW (if intent is simple_chat or fallback) ---
             
             # --- Robust @mention Logic with File Finder ---
             mentioned_context = {}
