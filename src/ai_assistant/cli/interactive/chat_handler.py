@@ -102,32 +102,24 @@ class ChatHandler:
                 console.print(f"[red]Error applying changes to {filename}: {e}[/red]")
 
     async def _stream_and_process_response(self, request: CodeRequest):
-        """
-        A dedicated coroutine to wrap the async generator and handle the streaming logic.
-        This is the correct pattern for use with asyncio.create_task.
-        """
         response_content = ""
-        
         try:
-            markdown_renderable = Markdown("", code_theme="vim")
-            with Live(markdown_renderable, console=console, refresh_per_second=10, vertical_overflow="visible") as live:
-                with console.status("[dim]Thinking...[/dim]", spinner="point"):
-                    async with AIService(self.config) as ai_service:
-                        async for chunk in ai_service.stream_generate(request):
-                            if self._stop_generation:
-                                raise asyncio.CancelledError
-                            response_content += str(chunk)
-                            markdown_renderable.text = response_content
+            # Use Live but with proper height constraint
+            with Live(Spinner("point", text="Thinking"), console=console, refresh_per_second=4, vertical_overflow="ellipsis" ) as live:
+                async with AIService(self.config) as ai_service:
+                    async for chunk in ai_service.stream_generate(request):
+                        if self._stop_generation:
+                            raise asyncio.CancelledError
+                        response_content += str(chunk)
+                        live.update(Markdown(response_content, code_theme="vim"))
             
             self.session.last_ai_response_content = response_content
             self.session.conversation_history.append({"role": "assistant", "content": response_content})
             await self._handle_code_response(response_content)
         except asyncio.CancelledError:
-            # Don't print a message here, the stop_generation method does it.
             pass
         except Exception as e:
             console.print(f"[bold red]Error during response generation: {e}[/bold red]")
-
 
     async def handle(self, message: str, session):
         """Main message handler with corrected @mention and AIService usage."""
