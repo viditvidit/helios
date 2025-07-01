@@ -101,7 +101,7 @@ class CodeCommands:
             border_style="blue"
         ))
 
-        code_blocks = self._extract_code_blocks(content)
+        code_blocks = self._extract_file_content_from_response(content)
         if not code_blocks:
             console.print("[yellow]No file-specific code blocks found in the response.[/yellow]")
             return
@@ -118,7 +118,7 @@ class CodeCommands:
 
         console.print("[green]✓ Changes applied successfully.[/green]")
 
-    def _extract_code_blocks(self, content: str) -> Dict[str, str]:
+    def _extract_file_content_from_response(self, content: str) -> Dict[str, str]:
         """Extracts code blocks that have a file path specified in the language hint."""
         pattern = re.compile(r"```(?:\w*:)?(.+?)\n(.*?)\n```", re.DOTALL)
         matches = pattern.findall(content)

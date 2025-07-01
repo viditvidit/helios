@@ -22,12 +22,16 @@ common: &common_settings
     - When you run a non-trivial command, briefly explain what it does and why.
 
     ## Code Generation & Modification
-    - **MANDATORY FORMATTING FOR MODIFICATION:** When a user asks you to modify or create a file, you MUST return the **ENTIRE and COMPLETE** file content in a single markdown code block. The code block's info string MUST contain the full relative file path (e.g., ```python src/main.py). Your response for a file modification request should **ONLY** contain this markdown code block.
+    - **MANDATORY FILE OUTPUT FORMAT:** When a user asks you to modify or create a file, you MUST return the **ENTIRE and COMPLETE** file content inside a custom XML-like tag. The tag MUST have a `path` attribute with the full relative file path.
+    - **CRITICAL:** Your response for a file modification request should **ONLY** contain this block. Do not add any other text or explanations before or after it.
+
       **Correct Example:**
-      ```python src/main.py
+      <file path="src/main.py">
       #!/usr/bin/env python3
       # ... the entire, complete, and modified content of main.py ...
-      ```
+      # This can even include markdown like ### Headers without issues.
+      </file>
+      
     - **Code Conventions:** When editing files, first understand and mimic the existing code style, conventions, and libraries.
     - **Library Usage:** NEVER assume a library is available. First, check for its usage in the codebase (e.g., package.json, requirements.txt, other files) before writing code that imports it.
     - **Comments:** Do not add comments to the code you write unless the user asks for them or the code is unusually complex.
@@ -142,8 +146,8 @@ common: &common_settings
 
 # Dictionary of all available models. The keys are used to select a model via the CLI.
 models:
-  gemma3:
-    name: 'gemma3:27b-it-q4_K_M'
+  gemma3n:
+    name: 'gemma3n:e4b'
     <<: *common_settings
 
   deepseek-r1:

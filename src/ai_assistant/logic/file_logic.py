@@ -1,7 +1,7 @@
 from pathlib import Path
 from rich.console import Console
 
-from ..utils.parsing_utils import extract_code_blocks
+from ..utils.parsing_utils import extract_file_content_from_response
 from ..services.file_service import FileService
 
 console = Console()
@@ -30,7 +30,7 @@ async def save_code(session, filename: str):
     if not session.last_ai_response_content:
         return console.print("[red]No AI response available to save from.[/red]")
 
-    code_blocks = extract_code_blocks(session.last_ai_response_content)
+    code_blocks = extract_file_content_from_response(session.last_ai_response_content)
     if not code_blocks:
         return console.print("[red]No code blocks found in the last AI response.[/red]")
 
@@ -106,7 +106,7 @@ async def save_code(session, file_path_str: str, code_to_save: str = None):
             console.print("[red]No AI response available to save from.[/red]")
             return False
             
-        code_blocks = extract_code_blocks(session.last_ai_response_content)
+        code_blocks = extract_file_content_from_response(session.last_ai_response_content)
         
         # --- FIX FOR ISSUE #2 ---
         # If no code blocks are found, assume the entire response is the file content.
@@ -136,7 +136,7 @@ async def apply_changes(session):
     if not session.last_ai_response_content:
         return console.print("[red]No AI response available to apply changes from.[/red]")
 
-    code_blocks = [b for b in extract_code_blocks(session.last_ai_response_content) if b.get('filename')]
+    code_blocks = [b for b in extract_file_content_from_response(session.last_ai_response_content) if b.get('filename')]
     if not code_blocks:
         return console.print("[yellow]No code blocks with file paths found in the response.[/yellow]")
 

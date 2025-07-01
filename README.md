@@ -1,13 +1,25 @@
-# AI Code Assistant - Helios
+# Project Title
 
-An intelligent coding assistant powered by local AI models, designed to help developers with code generation and context management.
+A brief description of what the project does.
 
-## Project Overview
+## Installation
 
-Helios is an AI-powered code assistant that provides:
-- Context-aware code suggestions
-- Interactive file management
-- Git operations integration
-- Smart code generation
+To install dependencies, run:
 
-The project is structured as follows:
+```bash
+npm install
+```
+
+## Usage
+
+Examples of how to use the project.
+
+## File Structure
+
+### `file1.js`
+
+Description of what this file does and any important functions.
+
+### `file2.js`
+
+Description of what this file does and any important functions.
