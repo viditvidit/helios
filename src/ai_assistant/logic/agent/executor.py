@@ -1,5 +1,3 @@
-# src/ai_assistant/logic/agent/executor.py
-
 import inspect
 import json
 from typing import List, Any, Tuple
