@@ -105,7 +105,7 @@ class ChatHandler:
         response_content = ""
         try:
             # Use Live but with proper height constraint
-            with Live(Spinner("point", text="Thinking"), console=console, refresh_per_second=4, vertical_overflow="ellipsis" ) as live:
+            with Live(Spinner("point", text="Thinking"), console=console, refresh_per_second=4) as live:
                 async with AIService(self.config) as ai_service:
                     async for chunk in ai_service.stream_generate(request):
                         if self._stop_generation:
