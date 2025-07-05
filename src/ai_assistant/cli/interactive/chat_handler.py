@@ -40,41 +40,42 @@ class ChatHandler:
         then renders the complete, final response beautifully.
         """
         response_content = ""
+        status_task = None
         try:
-            # Use a simple status spinner while collecting the response. This is clean and effective.
-            with console.status("[cyan]Helios is thinking...[/cyan]", spinner="point", spinner_style="cyan"):
-                async with AIService(self.config) as ai_service:
-                    async for chunk in ai_service.stream_generate(request):
-                        await asyncio.sleep(0)  # Yield control so cancellations can be processed
-                        if self._stop_generation:
-                            raise asyncio.CancelledError
-                        response_content += str(chunk)
+            status_task = asyncio.create_task(self._show_status("[cyan]Helios is thinking...[/cyan]"))
             
-            # --- Rendering happens *after* the stream is complete ---
+            async with AIService(self.config) as ai_service:
+                async for chunk in ai_service.stream_generate(request):
+                    if self._stop_generation:
+                        raise asyncio.CancelledError
+                    response_content += str(chunk)
+            
+            if status_task and not status_task.done():
+                status_task.cancel()
+                try:
+                    await status_task
+                except asyncio.CancelledError:
+                    pass
+            
             if not response_content:
                 return
 
             self.session.last_ai_response_content = response_content
             self.session.conversation_history.append({"role": "assistant", "content": response_content})
             
-            # Now, parse and render the final output
             file_blocks = extract_file_content_from_response(response_content)
             
-            console.print() # Add a newline for spacing
+            console.print()
 
             if not file_blocks:
-                # If it's a regular chat response, render it as simple markdown.
                 console.print(Markdown(response_content, code_theme="vim"))
             else:
-                # If it's a file modification, render each file in a beautiful panel.
                 for block in file_blocks:
-                    # Infer language for syntax highlighting from file extension.
                     syntax_lang = FileUtils.get_language_from_extension(Path(block['filename']).suffix)
                     
-                    # Use Syntax instead of Markdown for proper code highlighting
                     syntax_content = Syntax(
                         block['code'], 
-                        lexer=syntax_lang or "python",  # fallback to python if can't detect
+                        lexer=syntax_lang or "python",
                         theme="vim",
                         line_numbers=True,
                         word_wrap=True,
@@ -89,16 +90,36 @@ class ChatHandler:
                         padding=(1, 2)
                     ))
             
-            # Finally, notify the user that changes are available to be applied.
             if file_blocks:
                 console.print("\n[yellow]AI has suggested file changes. Use `/apply` to review and apply them.[/yellow]")
 
         except asyncio.CancelledError:
+            if status_task and not status_task.done():
+                status_task.cancel()
+                try:
+                    await status_task
+                except asyncio.CancelledError:
+                    pass
             console.print()
         except Exception as e:
+            if status_task and not status_task.done():
+                status_task.cancel()
+                try:
+                    await status_task
+                except asyncio.CancelledError:
+                    pass
             console.print(f"[bold red]Error during response generation: {e}[/bold red]")
             import traceback
             console.print(f"[dim]{traceback.format_exc()}[/dim]")
+
+    async def _show_status(self, message):
+        """Show status spinner that can be cancelled"""
+        try:
+            with console.status(message, spinner="point", spinner_style="cyan"):
+                while True:
+                    await asyncio.sleep(0.1)
+        except asyncio.CancelledError:
+            pass
 
     async def handle(self, message: str, session):
         """Main message handler with robust path detection and multimodal support."""
@@ -118,7 +139,7 @@ class ChatHandler:
             if found_paths:
                 console.print("[dim]Processing mentions...[/dim]")
                 for mention in set(found_paths):
-                    mention = mention.lstrip('@') # Sanitize @ here as well
+                    mention = mention.lstrip('@')
                     possible_path = Path(mention).expanduser()
                     if not possible_path.is_absolute():
                         full_path = self.config.work_dir / mention
