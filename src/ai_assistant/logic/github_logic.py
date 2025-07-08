@@ -187,7 +187,7 @@ async def pr_review(session, pr_number_str: str):
     pr_number = int(pr_number_str)
     try:
         service = GitHubService(session.config)
-        with console.status(f"[yellow]Generating AI review...[/yellow]"):
+        with console.status(f"[dim][cyan]Generating AI review...[/cyan][/dim]"):
             summary = await service.get_ai_pr_summary(pr_number)
         
         markdown_content = Markdown(summary)
