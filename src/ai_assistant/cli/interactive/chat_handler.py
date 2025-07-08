@@ -1,7 +1,5 @@
 import asyncio
 import re
-import base64
-import mimetypes
 from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
@@ -42,7 +40,7 @@ class ChatHandler:
         response_content = ""
         status_task = None
         try:
-            status_task = asyncio.create_task(self._show_status("[cyan]Helios is thinking...[/cyan]"))
+            status_task = asyncio.create_task(self._show_status("[cyan]Helios is thinking[/cyan]"))
             
             async with AIService(self.config) as ai_service:
                 async for chunk in ai_service.stream_generate(request):

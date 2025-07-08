@@ -10,7 +10,7 @@ setup(
     name="helios-code-assistant",
     version="1.0.0",
     author="Vidit",
-    description="AI Code Assistant - Local AI coding companion",
+    description="Helios - AI Code Assistant",
     long_description_content_type="text/markdown",
     url="https://github.com/yourusername/ai-code-assistant",
     packages=find_packages(where="src"),

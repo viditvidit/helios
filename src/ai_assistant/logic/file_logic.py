@@ -2,7 +2,6 @@ from pathlib import Path
 from rich.console import Console
 
 from ..utils.parsing_utils import extract_file_content_from_response
-from ..services.file_service import FileService
 
 console = Console()
 

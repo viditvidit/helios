@@ -1,10 +1,7 @@
-"""
-Service for static code analysis.
-"""
 import ast
 import logging
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 

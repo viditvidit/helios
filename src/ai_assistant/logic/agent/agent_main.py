@@ -1,5 +1,3 @@
-# src/ai_assistant/logic/agent/agent_main.py
-
 from rich.console import Console
 from rich.panel import Panel
 

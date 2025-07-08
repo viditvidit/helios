@@ -1,7 +1,4 @@
-# src/ai_assistant/logic/agent/tools.py
-
 import asyncio
-import re
 from typing import List, Dict, Any
 import questionary
 from bs4 import BeautifulSoup

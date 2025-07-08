@@ -1,10 +1,6 @@
-"""
-File operations service
-"""
 import logging
 import aiofiles
 from pathlib import Path
-from typing import List, Dict
 from ..core.config import Config
 from ..core.exceptions import FileServiceError
 

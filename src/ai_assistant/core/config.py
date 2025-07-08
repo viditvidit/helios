@@ -1,6 +1,3 @@
-"""
-Configuration management for AI Code Assistant
-"""
 import os
 from pathlib import Path
 from typing import Optional, Dict, List

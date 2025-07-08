@@ -1,10 +1,9 @@
 import difflib
 import os
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import Dict
 
 from ..core.config import Config
-
 
 def build_repo_context(repo_path: Path, config: Config) -> Dict[str, str]:
     """

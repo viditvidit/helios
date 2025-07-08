@@ -1,8 +1,5 @@
-"""
-Response models from AI service
-"""
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 @dataclass
 class CodeResponse:

@@ -1,5 +1,3 @@
-import os
-import asyncio
 import signal
 from pathlib import Path
 from typing import Optional, Iterable

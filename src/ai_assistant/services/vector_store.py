@@ -1,7 +1,3 @@
-"""
-Manages the vector store for Retrieval-Augmented Generation (RAG).
-Handles file chunking, embedding, indexing, and searching with lazy loading to prevent fork-related warnings and improve startup time.
-"""
 import pickle
 from pathlib import Path
 from typing import List, Dict, Any

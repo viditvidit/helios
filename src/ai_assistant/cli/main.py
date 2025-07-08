@@ -4,21 +4,15 @@ from pathlib import Path
 from typing import Optional
 import yaml
 import aiohttp
-
 import click
 import questionary
 from rich.console import Console
-from rich.panel import Panel
 
 from ..core.config import Config, PROJECT_ROOT
-from ..core.exceptions import AIAssistantError, NotAGitRepositoryError, ConfigurationError
+from ..core.exceptions import ConfigurationError
 from ..core.logger import setup_logging
-from .commands import CodeCommands
 from .interactive.session import InteractiveSession
 from .interactive import display
-from ..utils.git_utils import GitUtils
-from ..utils.file_utils import build_repo_context
-from ..services.vector_store import VectorStore
 
 console = Console()
 
