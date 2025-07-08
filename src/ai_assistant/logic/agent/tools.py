@@ -1,5 +1,4 @@
 import asyncio
-import re
 from typing import List, Dict, Any
 import questionary
 from bs4 import BeautifulSoup
@@ -18,7 +17,7 @@ from ...services.ai_service import AIService
 from ...services.github_service import GitHubService
 from ...models.request import CodeRequest
 from ...utils.git_utils import GitUtils
-from ...utils.parsing_utils import extract_code_blocks
+from ...utils.parsing_utils import extract_file_content_from_response
 
 console = Console()
 
@@ -223,7 +222,7 @@ async def generate_code_concurrently(session, files: List[Dict[str, Any]], cwd: 
                     generated_code += chunk
             
             # The AI might still sometimes add fences, so we strip them just in case.
-            code_blocks = extract_code_blocks(f"```{full_path.suffix.strip('.')}\n{generated_code}\n```")
+            code_blocks = extract_file_content_from_response(f"```{full_path.suffix.strip('.')}\n{generated_code}\n```")
             final_code = code_blocks[0]['code'] if code_blocks else generated_code
 
             await file_logic.save_code(session, str(full_path), final_code)

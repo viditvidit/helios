@@ -6,11 +6,9 @@ import copy
 import questionary
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 from rich.markdown import Markdown
 from rich.text import Text
 
-from ...logic import github_logic
 from ...services.ai_service import AIService
 from ...models.request import CodeRequest
 from .tools import TOOL_REGISTRY

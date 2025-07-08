@@ -1,10 +1,9 @@
 import difflib
 import os
 from pathlib import Path
-from typing import List, Tuple, Dict
+from typing import Dict
 
 from ..core.config import Config
-
 
 def build_repo_context(repo_path: Path, config: Config) -> Dict[str, str]:
     """
@@ -64,6 +63,7 @@ class FileUtils:
             '.rs': 'rust', '.rb': 'ruby', '.php': 'php',
             '.html': 'html', '.css': 'css', '.scss': 'scss',
             '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml',
-            '.md': 'markdown', '.txt': 'text', '.sh': 'bash'
+            '.md': 'markdown', '.txt': 'text', '.sh': 'bash',
+            '.toml': 'toml', '.ini': 'ini', '.cfg': 'ini'
         }
         return lang_map.get(ext.lower(), 'text')

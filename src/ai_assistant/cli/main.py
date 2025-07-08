@@ -2,21 +2,89 @@ import asyncio
 import sys
 from pathlib import Path
 from typing import Optional
-
+import yaml
+import aiohttp
 import click
 import questionary
 from rich.console import Console
-from rich.panel import Panel
 
-from ..core.config import Config
+from ..core.config import Config, PROJECT_ROOT
 from ..core.exceptions import ConfigurationError
 from ..core.logger import setup_logging
-from .commands import CodeCommands
 from .interactive.session import InteractiveSession
 from .interactive import display
-from ..services.vector_store import VectorStore
 
 console = Console()
+
+async def _run_first_time_setup():
+    """Guides the user through an initial setup process."""
+    console.print("\n[bold yellow]Welcome to Helios! It looks like this is your first run.[/bold yellow]")
+    console.print("Let's get you set up with your local AI model endpoint.")
+
+    endpoint = await questionary.text(
+        "Enter your Ollama endpoint URL:",
+        default="http://localhost:11434"
+    ).ask_async()
+
+    if not endpoint:
+        console.print("[red]Endpoint cannot be empty. Exiting setup.[/red]")
+        sys.exit(1)
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{endpoint}/api/tags") as response:
+                if response.status != 200:
+                    console.print(f"[red]Error: Could not connect to Ollama at {endpoint}. Status: {response.status}[/red]")
+                    console.print("Please ensure Ollama is running and accessible.")
+                    sys.exit(1)
+                models_data = await response.json()
+
+        available_models = [model['name'] for model in models_data.get('models', [])]
+        if not available_models:
+            console.print(f"[red]No models found at {endpoint}. Please pull a model with `ollama pull <model_name>`.[/red]")
+            sys.exit(1)
+
+        chosen_default = await questionary.select(
+            "Which model should be your default?",
+            choices=available_models,
+            use_indicator=True
+        ).ask_async()
+
+        if not chosen_default:
+            console.print("[yellow]No default model selected. Exiting setup.[/yellow]")
+            sys.exit(1)
+
+        # Create models.yaml
+        models_config = {
+            'default_model': chosen_default,
+            'models': {
+                name: {
+                    'name': name,
+                    'type': 'ollama',
+                    'endpoint': endpoint,
+                    'context_length': 8000,
+                    'temperature': 0.5,
+                    'max_tokens': 4096,
+                    'system_prompt': "You are Helios, a helpful AI code assistant. Your goal is to help users with their coding tasks by providing accurate, concise, and helpful responses.",
+                    'agent_instructions': "You are an autonomous agent. Formulate a plan and execute it step-by-step using the provided tools."
+                } for name in available_models
+            }
+        }
+        
+        config_dir = PROJECT_ROOT / "configs"
+        config_dir.mkdir(exist_ok=True)
+        models_yaml_path = config_dir / "models.yaml"
+        with open(models_yaml_path, 'w') as f:
+            yaml.dump(models_config, f, sort_keys=False)
+        console.print(f"[green]✓ Configuration saved to {models_yaml_path}[/green]")
+
+    except aiohttp.ClientError as e:
+        console.print(f"[red]Connection failed: {e}. Please check the Ollama endpoint and your network.[/red]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]An unexpected error occurred during setup: {e}[/red]")
+        sys.exit(1)
+
 
 async def _run_interactive_mode(config: Config):
     """Runs the interactive REPL mode after model selection."""
@@ -82,8 +150,13 @@ def cli(ctx, config: Optional[str], verbose: bool, model: Optional[str]):
             asyncio.run(_run_interactive_mode(ctx.obj))
 
     except ConfigurationError as e:
-        console.print(f"[red]Configuration Error: {e}[/red]")
-        sys.exit(1)
+        if "Models config file not found" in str(e):
+            asyncio.run(_run_first_time_setup())
+            console.print("\n[green]✓ Setup complete! Please run Helios again to start the session.[/green]")
+            sys.exit(0)
+        else:
+            console.print(f"[red]Configuration Error: {e}[/red]")
+            sys.exit(1)
     except Exception as e:
         import traceback
         console.print(f"[red]Error initializing: {e}[/red]")
