@@ -154,6 +154,6 @@ models:
     name: 'devstral:24b'
     <<: *common_settings
   
-  phi4-reasoning:
-    name: 'phi4-reasoning:14b-plus-q8_0'
+  magistral:
+    name: 'magistral:24b'
     <<: *common_settings
