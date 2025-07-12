@@ -81,7 +81,7 @@ class StatusBar:
             
         return HTML(
             f'<style>'
-            f'Dir: <b>{display_dir}</b> | '
+            f'Dir: <style bg="#b3b3b3"><b>{display_dir}</b></style>| '
             f'Branch: <style bg="ansigreen">{self._current_branch}</style> | '
             f'Model: <style bg="ansiyellow">{self._current_model}</style>'
             f'</style>'
@@ -151,7 +151,7 @@ class InteractiveSession:
             'completion-menu.meta.completion': 'bg:#1a1a1a #444444',
             '': '#00d7ff bold',  # Default text color (cyan, bold)
             'prompt': '#ffffff bold',  # Prompt symbol color
-            'bottom-toolbar': 'bg:#222222 #333333',  # Status bar style
+            'bottom-toolbar': 'bg:#cccccc #222222',  # Status bar style
         })
 
         prompt_session = PromptSession(

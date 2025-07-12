@@ -7,7 +7,6 @@ A command-line AI assistant for software engineering tasks with code generation,
 - [File Structure](#file-structure)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
 
@@ -59,21 +58,7 @@ The AI Code Assistant provides the following core functionalities:
 
 ### Prerequisites
 - Python 3.8 or higher
-- Docker (optional)
 - Git repository setup
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/your-repository.git
-cd ai_code_assistant
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
 
 ## Usage
 

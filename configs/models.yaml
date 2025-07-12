@@ -146,12 +146,16 @@ common: &common_settings
 
 # Dictionary of all available models. The keys are used to select a model via the CLI.
 models:
+  gemma3:
+    name: 'gemma3:27b-it-q4_K_M'
+    <<: *common_settings
+
   gemma3n:
     name: 'gemma3n:e4b'
     <<: *common_settings
 
   deepseek-r1:
-    name: 'deepseek-r1:32b'
+    name: 'deepseek-r1:14b'
     <<: *common_settings
   
   devstral: 

@@ -1,11 +1,8 @@
 import asyncio
 from typing import List, Dict, Any
 import questionary
-from bs4 import BeautifulSoup
 from pathlib import Path
 
-from googlesearch import search as google_search
-import requests
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TaskProgressColumn
 from rich.text import Text
@@ -246,29 +243,6 @@ async def generate_code_concurrently(session, files: List[Dict[str, Any]], cwd: 
     
     return all(results)
 
-
-async def web_search(query: str, num_results: int = 5) -> str:
-    """Performs a web search using Google and returns the top results."""
-    console.print(f"Searching web for: [italic]{query}[/italic]...")
-    try:
-        with console.status(f"[cyan]Searching Google...[/cyan]"):
-            search_results = await asyncio.to_thread(google_search, query, num_results=num_results, stop=num_results, pause=1)
-        return "\n".join([f"{i+1}. {result}" for i, result in enumerate(search_results)]) or "No results found."
-    except Exception as e:
-        return f"Error during web search: {e}"
-
-async def fetch_web_content(url: str) -> str:
-    """Fetches the textual content of a given URL, stripping HTML."""
-    console.print(f"Fetching content from: [italic]{url}[/italic]...")
-    try:
-        with console.status(f"[cyan]Fetching web content...[/cyan]"):
-            response = await asyncio.to_thread(requests.get, url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-        return ' '.join(soup.get_text().split())[:8000]
-    except Exception as e:
-        return f"Error fetching URL content: {e}"
-
 async def github_create_repo_non_interactive(session, repo_name: str, description: str = "", is_private: bool = False) -> bool:
     """Ensures a GitHub repository exists. Creates it if it's missing, otherwise uses the existing one."""
     console.print(f"Ensuring GitHub repo exists: [italic]{repo_name}[/italic]...")
@@ -359,13 +333,5 @@ TOOL_REGISTRY = {
         "function": review_and_commit_changes,
         "description": "A powerful tool to stage all files, show a summary of changes, and commit them with a message. Use for managing changes within an existing repository.",
         "parameters": {"commit_message": "string"}
-    },
-    "web_search": {
-        "function": web_search, 
-        "description": "Performs a Google search to find information, documentation, or best practices before generating code.", "parameters": {"query": "string"}
-    },
-    "fetch_web_content": {
-        "function": fetch_web_content, 
-        "description": "Reads the text content of a URL. Use after `web_search` to 'read' a promising link.", "parameters": {"url": "string"}
-    },
+    }
 }
