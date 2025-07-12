@@ -9,8 +9,14 @@ console = Console()
 
 def print_helios_banner():
     os.system('cls' if os.name == 'nt' else 'clear')
-    f = Figlet(font='o8')
-    banner = f.renderText('HELIOS')
+    banner = """
+    ██╗  ██╗███████╗██╗     ██╗ ██████╗ ███████╗
+    ██║  ██║██╔════╝██║     ██║██╔═══██╗██╔════╝
+    ███████║█████╗  ██║     ██║██║   ██║███████╗
+    ██╔══██║██╔══╝  ██║     ██║██║   ██║╚════██║
+    ██║  ██║███████╗███████╗██║╚██████╔╝███████║
+    ╚═╝  ╚═╝╚══════╝╚══════╝╚═╝ ╚═════╝ ╚══════╝
+    """
     console.print(f"[bold orange1]{banner}[/bold orange1]")
 
 def show_welcome():
