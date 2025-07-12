@@ -1,6 +1,5 @@
 from rich.console import Console
 from rich.panel import Panel
-from pyfiglet import Figlet
 from pathlib import Path
 from typing import Dict
 import os
