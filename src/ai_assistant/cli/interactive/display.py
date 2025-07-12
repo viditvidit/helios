@@ -68,7 +68,7 @@ def show_help():
   /pr_merge <#>, /pm       [dim]Merge a Pull Request[/dim]
 
   [bold cyan]Helios Agent:[/bold cyan]
-  /knight <goal>, /k       [dim]Activate the advanced autonomous agent to achieve a high-level goal with web search and research tools[/dim]
+  /knight <goal>, /k       [dim]Activate the advanced autonomous agent to achieve a high-level goal[/dim]
 
  [bold cyan]Code Quality Commands:[/bold cyan]
   /optimize <filename>, /o [dim]Ask the AI to optimize/refactor a specific file[/dim]
