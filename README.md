@@ -1,12 +1,11 @@
-# AI Code Assistant
+# Helios
 
 A command-line AI assistant for software engineering tasks with code generation, git integration, and repository management capabilities.
 
 ## Table of Contents
 - [Features](#features)
 - [File Structure](#file-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
+- [Prerequisites](#prerequisites)
 - [Usage](#usage)
 - [Configuration](#configuration)
 
@@ -54,9 +53,7 @@ The AI Code Assistant provides the following core functionalities:
 - Specifies agent instructions and principles
 - Includes guidelines for code generation and project setup
 
-## Getting Started
-
-### Prerequisites
+## Prerequisites
 - Python 3.8 or higher
 - Git repository setup
 
