@@ -6,11 +6,9 @@ import copy
 import questionary
 from rich.console import Console
 from rich.panel import Panel
-from rich.syntax import Syntax
 from rich.markdown import Markdown
 from rich.text import Text
 
-from ...logic import github_logic
 from ...services.ai_service import AIService
 from ...models.request import CodeRequest
 from .tools import TOOL_REGISTRY
@@ -32,6 +30,7 @@ class Executor:
         summary_prompt = (
             "You are a summarization AI. A user provided a goal, and an agent created a technical plan. "
             "Convert this plan into a human-readable markdown checklist of the key outcomes. "
+            "Only list out the checklist options, no headings of tasks. "
             "Focus on what will be created or achieved.\n\n"
             f"**User's Goal:** {goal}\n\n"
             f"**Technical Plan Steps:**\n{plan_str}\n\n"
@@ -67,10 +66,6 @@ class Executor:
             action_text = f"[bold cyan]git commit -m[/bold cyan] [green]\"{args.get('commit_message', '')}\"[/green]"
         elif command == "setup_git_and_push":
             action_text = f"[bold cyan]Initializing Git and pushing to new repo...[/bold cyan]"
-        elif command == "web_search":
-             action_text = f"[bold cyan]Searching web:[/bold cyan] [green]\"{args.get('query', '')}\"[/green]"
-        elif command == "fetch_web_content":
-            action_text = f"[bold cyan]Fetching content from URL...[/bold cyan]"
 
         return action_text, reasoning
 

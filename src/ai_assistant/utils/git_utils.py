@@ -1,5 +1,3 @@
-# src/ai_assistant/utils/git_utils.py
-
 import asyncio
 import subprocess
 from pathlib import Path

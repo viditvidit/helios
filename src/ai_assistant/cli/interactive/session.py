@@ -1,5 +1,3 @@
-import os
-import asyncio
 import signal
 from pathlib import Path
 from typing import Optional, Iterable
@@ -9,6 +7,7 @@ import questionary
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import Completer, Completion, FuzzyCompleter
 from prompt_toolkit.styles import Style
+from prompt_toolkit.formatted_text import HTML
 
 from .command_handler import CommandHandler
 from .chat_handler import ChatHandler
@@ -46,22 +45,47 @@ class FilePathCompleter(Completer):
                         display=path
                     )
 
-    '''def get_completions(self, document, complete_event):
-        """Return completions for file paths when @ symbol is used."""
-        text = document.text
-        if '@' in text:
-            at_pos = text.rfind('@')
-            search_text = text[at_pos + 1:]
-            
-            for file_path in self.file_list:
-                if file_path.lower().startswith(search_text.lower()):
-                    yield Completion(
-                        file_path,
-                        start_position=-len(search_text),
-                        display=file_path
-                    )'''
+class StatusBar:
+    """Manages the status bar information."""
     
+    def __init__(self, config: Config):
+        self.config = config
+        self.git_utils = GitUtils()
+        self._current_dir = str(Path.cwd())
+        self._current_branch = None
+        self._current_model = config.model_name
         
+    async def get_current_branch(self) -> str:
+        """Get the current git branch."""
+        try:
+            if await self.git_utils.is_git_repo(Path.cwd()):
+                branch = await self.git_utils.get_current_branch(Path.cwd())
+                return branch or "no-branch"
+            return "no-git"
+        except Exception:
+            return "no-git"
+    
+    async def update_status(self):
+        """Update status information."""
+        self._current_dir = str(Path.cwd())
+        self._current_branch = await self.get_current_branch()
+        self._current_model = self.config.model_name
+        
+    def get_toolbar_text(self) -> HTML:
+        """Get the toolbar text for prompt_toolkit."""
+        # Truncate directory path if too long
+        max_dir_len = 40
+        display_dir = self._current_dir
+        if len(display_dir) > max_dir_len:
+            display_dir = "..." + display_dir[-(max_dir_len-3):]
+            
+        return HTML(
+            f'<style>'
+            f'Dir: <style bg="#b3b3b3"><b>{display_dir}</b></style>| '
+            f'Branch: <style bg="ansigreen">{self._current_branch}</style> | '
+            f'Model: <style bg="ansiyellow">{self._current_model}</style>'
+            f'</style>'
+        )
 
 class InteractiveSession:
     """Manages the state and main loop for an interactive chat session."""
@@ -75,6 +99,7 @@ class InteractiveSession:
         self.last_ai_response_content: Optional[str] = None
         self.command_handler = CommandHandler(self)
         self.chat_handler = ChatHandler(self)
+        self.status_bar = StatusBar(config)
         signal.signal(signal.SIGINT, self._handle_interrupt)
 
     def _handle_interrupt(self, signum, frame):
@@ -99,7 +124,7 @@ class InteractiveSession:
             console.print("[red]Initialization cancelled. Exiting.[/red]"); exit(0)
 
     async def start(self):
-        """Start the interactive mode session, with advanced autocomplete."""
+        """Start the interactive mode session, with advanced autocomplete and status bar."""
         await self._setup_working_directory()
         
         file_contents = await indexing_logic.check_and_run_startup_indexing(self.config)
@@ -108,6 +133,9 @@ class InteractiveSession:
         else:
             console.print("[yellow]Could not initialize repository context.[/yellow]")
         
+        # Initialize status bar
+        await self.status_bar.update_status()
+        
         display.show_welcome()
 
         # --- NEW: Setup prompt_toolkit session with custom styles and fuzzy completer ---
@@ -115,7 +143,7 @@ class InteractiveSession:
         file_completer = FilePathCompleter(self)  # Pass session instead of static file list
         fuzzy_file_completer = FuzzyCompleter(file_completer)
 
-        # Custom styles for the autocomplete menu
+        # Custom styles for the autocomplete menu and status bar
         style = Style.from_dict({
             'completion-menu.completion.current': 'bg:#333333 #ffffff', # Selected item
             'completion-menu.completion': 'bg:#1a1a1a #666666',      # Other items
@@ -123,6 +151,7 @@ class InteractiveSession:
             'completion-menu.meta.completion': 'bg:#1a1a1a #444444',
             '': '#00d7ff bold',  # Default text color (cyan, bold)
             'prompt': '#ffffff bold',  # Prompt symbol color
+            'bottom-toolbar': 'bg:#cccccc #222222',  # Status bar style
         })
 
         prompt_session = PromptSession(
@@ -131,12 +160,16 @@ class InteractiveSession:
             complete_while_typing=True,
             style=style,
             input_processors=[],
+            bottom_toolbar=self.status_bar.get_toolbar_text,
         )
 
         while True:
             try:
+                # Update status bar before each prompt
+                await self.status_bar.update_status()
+                
                 console.print("")
-                user_input = await prompt_session.prompt_async("> ")
+                user_input = await prompt_session.prompt_async()
                 
                 if not user_input.strip(): continue
                 if user_input.lower() in ['exit', 'quit', 'bye']: display.show_goodbye(); break

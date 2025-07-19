@@ -5,7 +5,6 @@ from rich.text import Text
 
 from pathlib import Path
 import questionary
-import re
 
 from ..utils.git_utils import GitUtils
 from ..core.exceptions import NotAGitRepositoryError

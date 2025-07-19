@@ -1,7 +1,3 @@
-"""
-Utility for building prompts to send to the AI model.
-"""
-from typing import Dict
 from ..core.config import ModelConfig
 from ..models.request import CodeRequest
 

@@ -1,13 +1,7 @@
-"""
-AI Service for handling local model interactions.
-Refactored to use the Ollama /api/chat endpoint for better instruction following.
-"""
 import asyncio
 import json
-from typing import Optional, AsyncGenerator, List, Dict
-
 import aiohttp
-from rich.text import Text
+from typing import Optional, AsyncGenerator, List, Dict
 
 from ..core.config import Config
 from ..core.exceptions import AIServiceError

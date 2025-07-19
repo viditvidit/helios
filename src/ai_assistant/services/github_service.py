@@ -182,7 +182,6 @@ class GitHubService:
             files = pr.get_files()
 
             # --- Stage 1: Concurrent Summarization ---
-            console.print(f"\n[dim]Summarizing {len(list(files))} changed files...[/dim]")
             summary_tasks = [self._get_diff_summary(file.filename, file.patch) for file in files if file.patch]
             file_summaries = await asyncio.gather(*summary_tasks)
             
@@ -196,8 +195,9 @@ class GitHubService:
                 f"**Summary of File Changes**:\n{summaries_text}\n\n"
                 "Based on the title, body, and the file change summaries, please:\n"
                 "1.  Write a brief overall summary of the PR's purpose.\n"
-                "2.  Explain concise changes in files, do not provide full code or its explanation.\n"
-                "3.  Identify any potential risks, logical gaps, or areas that might need closer inspection."
+                "2.  Explain changes in files, do not provide full code, try keeping it as short as possible without losing out on details.\n"
+                "3.  Identify any logical gaps, or areas that might need closer inspection."
+                "4.  Answer confidently, do not use words that show doubt."
             )
 
             request = CodeRequest(prompt=final_prompt)

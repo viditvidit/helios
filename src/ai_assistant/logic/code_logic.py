@@ -2,7 +2,6 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
-import asyncio
 
 from ..services.ai_service import AIService
 from ..models.request import CodeRequest

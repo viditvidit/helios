@@ -1,4 +1,3 @@
-# src/ai_assistant/core/exceptions.py
 class AIAssistantError(Exception):
     """Base class for AI Assistant exceptions."""
     pass

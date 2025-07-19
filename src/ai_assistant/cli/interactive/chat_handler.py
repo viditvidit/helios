@@ -1,6 +1,7 @@
 import asyncio
 import re
 from pathlib import Path
+from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
@@ -73,7 +74,7 @@ class ChatHandler:
                     
                     syntax_content = Syntax(
                         block['code'], 
-                        lexer=syntax_lang or "python",
+                        lexer=syntax_lang,
                         theme="vim",
                         line_numbers=True,
                         word_wrap=True,
@@ -149,13 +150,13 @@ class ChatHandler:
                         continue
 
                     if full_path.is_dir():
-                        console.print(f" [dim]Adding context from directory: {mention}[/dim]")
+                        console.print(f"[dim]Added context from directory: {mention}[/dim]")
                         dir_context = build_repo_context(full_path, self.config)
                         for file_path, content in dir_context.items():
                             relative_path = str(Path(file_path).relative_to(self.config.work_dir))
                             mentioned_context[relative_path] = content
                     elif full_path.is_file():
-                        console.print(f" [dim]Adding context from file: {mention}[/dim]")
+                        console.print(f"[dim]Added context from file: {mention}[/dim]")
                         try:
                             content = await self.session.file_service.read_file(full_path)
                             mentioned_context[str(full_path.relative_to(self.config.work_dir))] = content
