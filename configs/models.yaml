@@ -154,6 +154,10 @@ models:
     name: 'gemma3n:e4b'
     <<: *common_settings
 
+  deepseek-coder:
+    name: 'deepseek-coder-v2:16b'
+    <<: *common_settings
+
   deepseek-r1:
     name: 'deepseek-r1:14b'
     <<: *common_settings
