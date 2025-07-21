@@ -56,10 +56,13 @@ Modify configuration settings in `configs/models.yaml` to customize:
 ![file mention](images/mentions.png)
 ![file explanation](images/explain.png)
 
-### GitHub Review:
+### GitHub Features:
 
+**Smart Commit-Push-Review-PR**
 ![file staging](images/rv.png)
 ![view diff](images/rv2.png)
+**Open PRs**
+![open PRS](images/open-pr.png)
 
 ### Knight Agent
 **Agent prompt and plan**
@@ -75,3 +78,10 @@ Modify configuration settings in `configs/models.yaml` to customize:
 Other Git creations:
 
 ![examples](images/demo.png)
+
+### AI Features:
+
+**PR Review**
+![ai review](images/pr_rev.png)
+**Repo Summary**
+![repo summary](images/repo_rv.png)
