@@ -98,7 +98,7 @@ class VectorStore:
             console.print("[yellow]No text chunks were generated from files.[/yellow]")
             return
             
-        with console.status("[bold yellow]Creating embeddings...[/bold yellow]", spinner="point"):
+        with console.status("[bold yellow]Creating embeddings...[/bold yellow]", spinner="bouncingBall", spinner_style="yellow"):
             embeddings = self.embedding_model.encode(all_chunks_text, show_progress_bar=False)
         
         dimension = embeddings.shape[1]

@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 from typing import List, Dict, Any
 import questionary
 from pathlib import Path
@@ -83,13 +84,43 @@ async def _get_ai_corrected_command(session, original_command: str, stderr: str)
     # Clean up markdown fences and whitespace
     return correction.strip().replace('`', '')
 
-async def run_shell_command(session, command: str, cwd: str, can_fail: bool = False, verbose: bool = False) -> bool:
-    """Executes a shell command with real-time output streaming."""
+async def run_shell_command(session, command: str, cwd: str, can_fail: bool = False, verbose: bool = False, interactive: bool = False) -> bool:
+    """Executes a shell command with real-time output streaming or in interactive mode."""
     run_dir = Path(cwd)
-    
-    # Print command info once and don't repeat it
-    console.print(f"Running command: [bold magenta]{command}[/bold magenta] in [dim]{run_dir}[/dim]")
 
+    # Pre-execution check for the command's existence
+    executable = command.split()[0]
+    if not shutil.which(executable):
+        console.print(f"[bold red]✗ Command not found: '{executable}'. Please ensure it is installed and in your system's PATH.[/bold red]")
+        return False
+    console.print(f"Running command: [bold dark_green]{command}[/bold dark_green] in [dim]{run_dir}[/dim]")
+
+    if interactive:
+        console.print("[yellow]Running in interactive mode. Manual input may be required.[/yellow]")
+        try:
+            process = await asyncio.create_subprocess_shell(
+                command,
+                cwd=run_dir,
+                stdin=None,
+                stdout=None,
+                stderr=None
+            )
+            await process.wait()
+
+            if process.returncode == 0:
+                console.print(f"[green]✓ Interactive command finished successfully.[/green]")
+                return True
+            else:
+                console.print(f"[bold red]Interactive command failed. Return code: {process.returncode}[/bold red]")
+                if can_fail:
+                    console.print("[yellow]Continuing execution as this step was allowed to fail.[/yellow]")
+                    return True
+                return False
+        except Exception as e:
+            console.print(f"[red]✗ An unexpected error occurred while running interactive shell command: {e}[/red]")
+            return False
+
+    # Non-interactive mode with output capturing
     try:
         start_time = asyncio.get_event_loop().time()
         
@@ -100,11 +131,9 @@ async def run_shell_command(session, command: str, cwd: str, can_fail: bool = Fa
             cwd=run_dir
         )
         
-        # Create a live panel for streaming output
         output_lines = []
-        max_lines = 15  # Show last 15 lines
+        max_lines = 15
         
-        # Status tracking
         elapsed = 0
         
         async def read_output():
@@ -115,18 +144,14 @@ async def run_shell_command(session, command: str, cwd: str, can_fail: bool = Fa
                     break
                 
                 decoded_line = line.decode().strip()
-                if decoded_line:  # Only add non-empty lines
+                if decoded_line:
                     output_lines.append(decoded_line)
-                    # Keep only the last max_lines
                     if len(output_lines) > max_lines:
                         output_lines = output_lines[-max_lines:]
         
-        # Use a simple status spinner instead of complex panel updates
-        with console.status(f"[cyan]Executing...[/cyan]") as status:
-            # Start reading output
+        with console.status(f"[cyan]Executing...[/cyan]", spinner="bouncingBall", spinner_style="cyan") as status:
             read_task = asyncio.create_task(read_output())
             
-            # Update status with elapsed time
             while process.returncode is None:
                 await asyncio.sleep(1)
                 elapsed += 1
@@ -134,10 +159,8 @@ async def run_shell_command(session, command: str, cwd: str, can_fail: bool = Fa
                 time_str = f"{mins}m {secs}s" if mins > 0 else f"{secs}s"
                 status.update(f"[cyan]Executing... ({time_str})[/cyan]")
         
-        # Ensure we've read all output
         await read_task
         
-        # Calculate final execution time
         end_time = asyncio.get_event_loop().time()
         execution_time = end_time - start_time
         mins, secs = divmod(int(execution_time), 60)
@@ -146,7 +169,6 @@ async def run_shell_command(session, command: str, cwd: str, can_fail: bool = Fa
         if process.returncode == 0:
             console.print(f"[green]✓ Shell command finished successfully in {time_str}[/green]")
             
-            # Show final output summary
             if output_lines:
                 last_lines = output_lines[-3:]
                 if last_lines:
@@ -154,7 +176,6 @@ async def run_shell_command(session, command: str, cwd: str, can_fail: bool = Fa
             
             return True
         
-        # Handle command failure
         console.print(f"[bold red]Shell command failed after {time_str}. Return code: {process.returncode}[/bold red]")
         
         if output_lines:
@@ -169,10 +190,9 @@ async def run_shell_command(session, command: str, cwd: str, can_fail: bool = Fa
             console.print("[yellow]Continuing execution as this step was allowed to fail.[/yellow]")
             return True
 
-        # Try AI correction
         error_text = "\n".join(output_lines[-5:]) if output_lines else "Command failed with no output"
         
-        with console.status("[cyan]Asking AI for a fix...[/cyan]"):
+        with console.status("[cyan]Asking AI for a fix...[/cyan]", spinner="bouncingBall", spinner_style="cyan"):
             corrected_command = await _get_ai_corrected_command(session, command, error_text)
 
         if not corrected_command or corrected_command.lower() == command.lower():
@@ -180,11 +200,38 @@ async def run_shell_command(session, command: str, cwd: str, can_fail: bool = Fa
             return False
 
         console.print(f"Helios suggests this correction: [bold yellow]{corrected_command}[/bold yellow]")
-        if await questionary.confirm("Execute the corrected command?", default=True).ask_async():
-            return await run_shell_command(session, corrected_command, cwd, can_fail, verbose)
-        else:
+        
+        action = await questionary.select(
+            "What would you like to do?",
+            choices=[
+                "Yes (Execute suggestion)",
+                "Edit command",
+                "No (Abort step)"
+            ],
+            use_indicator=True
+        ).ask_async()
+
+        if not action or action == "No (Abort step)":
             console.print("[yellow]User declined correction. Aborting step.[/yellow]")
             return False
+            
+        command_to_run = corrected_command
+        
+        if action == "Edit command":
+            edited_command = await questionary.text(
+                "Enter the command to run:",
+                default=corrected_command
+            ).ask_async()
+            
+            if not edited_command:
+                console.print("[yellow]No command entered. Aborting step.[/yellow]")
+                return False
+            
+            command_to_run = edited_command
+
+        # For both "Yes" and a successful "Edit", run the command
+        return await run_shell_command(session, command_to_run, cwd, can_fail, verbose, interactive=interactive)
+
 
     except Exception as e:
         console.print(f"[red]✗ An unexpected error occurred while running shell command: {e}[/red]")
@@ -195,7 +242,7 @@ async def generate_code_concurrently(session, files: List[Dict[str, Any]], cwd: 
     base_dir = Path(cwd)
     console.print(f"[dim]Generating code in directory: {base_dir}[/dim]")
     
-    progress = Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), BarColumn(), TaskProgressColumn(), console=console, transient=True)
+    progress = Progress(SpinnerColumn(spinner_name="bouncingBall", style="cyan"), TextColumn("[progress.description]{task.description}"), BarColumn(), TaskProgressColumn(), console=console, transient=True)
 
     async def generate_and_save(file_path_str: str, file_prompt: str, p_task_id: Any):
         full_path = base_dir / file_path_str
@@ -247,7 +294,7 @@ async def github_create_repo_non_interactive(session, repo_name: str, descriptio
     """Ensures a GitHub repository exists. Creates it if it's missing, otherwise uses the existing one."""
     console.print(f"Ensuring GitHub repo exists: [italic]{repo_name}[/italic]...")
     try:
-        with console.status(f"[cyan]Checking/creating GitHub repository...[/cyan]"):
+        with console.status(f"[cyan]Checking/creating GitHub repository...[/cyan]", spinner="bouncingBall", spinner_style="cyan"):
             service = GitHubService(session.config)
             repo = await service.get_or_create_repo(repo_name, is_private, description)
         if repo:
@@ -264,7 +311,7 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
     git_utils = GitUtils()
     work_dir = session.work_dir
 
-    with console.status(f"[cyan]Initializing Git repository...[/cyan]"):
+    with console.status(f"[cyan]Initializing Git repository...[/cyan]", spinner="bouncingBall", spinner_style="cyan"):
         if not await git_utils.is_git_repo(work_dir):
             await git_utils.init_repo(work_dir)
         
@@ -275,7 +322,7 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
     if "nothing to commit" in status:
         console.print("[yellow]✓ No changes to commit.[/yellow]")
     else:
-        with console.status(f"[cyan]Committing changes...[/cyan]"):
+        with console.status(f"[cyan]Committing changes...[/cyan]", spinner="bouncingBall", spinner_style="cyan"):
             await git_utils.commit(work_dir, commit_message)
         console.print("[green]✓ Files committed.[/green]")
 
@@ -285,7 +332,7 @@ async def setup_git_and_push(session, commit_message: str, repo_name: str, branc
     clone_url = getattr(session, 'repo_clone_url', None)
     if not clone_url: return False
 
-    with console.status(f"[cyan]Setting up remote and pushing...[/cyan]"):
+    with console.status(f"[cyan]Setting up remote and pushing...[/cyan]", spinner="bouncingBall", spinner_style="cyan"):
         try:
             await git_utils._run_git_command(work_dir, ['remote', 'add', 'origin', clone_url])
         except Exception:
@@ -316,8 +363,8 @@ TOOL_REGISTRY = {
     },
     "run_shell_command": {
         "function": run_shell_command,
-        "description": "Executes a shell command. Use for project setup, dependency installation, running build tools, etc. It can self-correct on failure. ALWAYS use the `cwd` argument to specify which directory to run in.",
-        "parameters": { "command": "string", "cwd": "string", "can_fail": "boolean (optional, default False)", "verbose": "boolean (optional, default False)" }
+        "description": "Executes a shell command. Use for project setup, dependency installation, running build tools, etc. It can self-correct on failure. For commands requiring user input (e.g., scaffolding tools like `create-next-app`), set `interactive=True`. ALWAYS use the `cwd` argument to specify which directory to run in.",
+        "parameters": { "command": "string", "cwd": "string", "can_fail": "boolean (optional, default False)", "verbose": "boolean (optional, default False)", "interactive": "boolean (optional, default False)" }
     },
     "generate_code_concurrently": {
         "function": generate_code_concurrently,

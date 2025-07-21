@@ -78,6 +78,12 @@ common: &common_settings
     ---
     ### **TOOL & COMMAND GUIDELINES**
 
+    - **Path Relativity (CRITICAL):** After `create_project_workspace` creates a directory (e.g., "my-app"), all subsequent operations are inside it. When using `generate_code_concurrently`, the `filename` for each file MUST be relative to that workspace. **DO NOT** repeat the project's root directory name in the filename.
+        - **Correct:** `cwd: "my-app"`, `filename: "src/index.js"`
+        - **INCORRECT:** `cwd: "my-app"`, `filename: "my-app/src/index.js"`
+
+    - **Dependency Awareness:** The `run_shell_command` tool automatically checks if the command (e.g., `npm`, `pip`, `streamlit`) exists before running it. **DO NOT** create steps to install tools that are likely already on a developer's machine. The system will handle it if a tool is missing.
+    - **Interactive Commands:** For commands that prompt for user input (e.g., `npx create-next-app`, `npm init`), you MUST set the `interactive` argument to `true` in the `run_shell_command` tool. This allows the user to answer the prompts directly. For non-interactive commands (e.g., `npm install`, `ls`), omit this argument.
     - **Directory Management:** NEVER use `cd`. To run a command in a subdirectory, **ALWAYS use the `cwd` argument.**
     - **Parameter Flexibility:** Tools may ignore parameters they don't support. Focus on the core functionality rather than specific parameter names.
     - **Self-Correction:** If a command fails, the system will attempt to self-correct or provide alternatives.
@@ -105,31 +111,31 @@ common: &common_settings
         "arguments": {
           "files": [
             {
-              "filename": "todo-app/.env",
+              "filename": ".env",
               "prompt": "REACT_APP_API_URL=https://jsonplaceholder.typicode.com/todos"
             },
             {
-              "filename": "todo-app/.gitignore",
+              "filename": ".gitignore",
               "prompt": "node_modules\n.env\nbuild"
             },
             {
-              "filename": "todo-app/src/api.js",
+              "filename": "src/api.js",
               "prompt": "Create a file to handle API calls. Export an async function `fetchTodos` that uses axios to GET todos from the URL in `process.env.REACT_APP_API_URL`."
             },
             {
-              "filename": "todo-app/src/components/TodoList.js",
+              "filename": "src/components/TodoList.js",
               "prompt": "Create a React component `TodoList`. It receives `todos` as a prop and maps over them, rendering each todo's title in a list item. Add a key to each item."
             },
             {
-              "filename": "todo-app/src/App.css",
+              "filename": "src/App.css",
               "prompt": "Create professional styling for the app. Style the main container with a max-width, center it, and add a box-shadow. Style the list items with padding and a bottom border. Style the input and button to be clean and modern."
             },
             {
-              "filename": "todo-app/src/App.js",
+              "filename": "src/App.js",
               "prompt": "Completely replace the boilerplate. Import React's useState and useEffect, './App.css', `fetchTodos` from './api.js', and `TodoList` from './components/TodoList.js'. In the `App` component, create state for `todos` and `loading`. Use `useEffect` to call `fetchTodos` on mount, update state. Render a title, a loading message, and the `TodoList` component, passing the todos as a prop."
             },
             {
-              "filename": "todo-app/README.md",
+              "filename": "README.md",
               "prompt": "Create a README file. Include a title, a brief description, and sections for 'Setup' (npm install) and 'Running the App' (npm start)."
             }
           ]

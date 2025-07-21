@@ -91,7 +91,7 @@ class Planner:
         
         request = CodeRequest(prompt=final_prompt)
         raw_response = ""
-        with console.status(f"[{Theme.PROMPT}][dim]The Knight is formulating a plan[/dim][/{Theme.PROMPT}]"):
+        with console.status(f"[{Theme.PROMPT}][dim]The Knight is formulating a plan[/dim][/{Theme.PROMPT}]", spinner="bouncingBall", spinner_style=Theme.PROMPT):
             async with AIService(self.config) as ai_service:
                 async for chunk in ai_service.stream_generate(request):
                     raw_response += chunk

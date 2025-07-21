@@ -50,7 +50,7 @@ async def create_repo(session):
         description = await questionary.text("Description (optional):").ask_async()
         is_private = await questionary.confirm("Make repository private?", default=True, auto_enter=False).ask_async()
 
-        with console.status(f"Creating repository '{repo_name}' on GitHub..."):
+        with console.status(f"Creating repository '{repo_name}' on GitHub...", spinner="bouncingBall"):
             clone_url = await service.create_repo(repo_name, is_private, description)
         
         console.print(f"To clone your new repository, run:\n[bold]git clone {clone_url}[/bold]")
@@ -67,7 +67,7 @@ async def create_branch(session):
         if not branch_name: return console.print("[red]Branch name cannot be empty.[/red]")
         source_branch = await questionary.text("Source Branch on remote:", default="main").ask_async()
 
-        with console.status(f"Creating remote branch '{branch_name}' from '{source_branch}'..."):
+        with console.status(f"Creating remote branch '{branch_name}' from '{source_branch}'...", spinner="bouncingBall"):
             await service.create_branch(branch_name, source_branch)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -82,7 +82,7 @@ async def create_issue(session):
         if not title: return console.print("[red]Title cannot be empty.[/red]")
         body = await questionary.text("Issue Body (optional, markdown supported):").ask_async()
         
-        with console.status(f"Creating issue: '{title}'..."):
+        with console.status(f"Creating issue: '{title}'...", spinner="bouncingBall"):
             await service.create_issue(title, body)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -143,7 +143,7 @@ async def interactive_pr_creation(session):
                 await git_utils.switch_branch(repo_path, head_branch)
                 console.print(f"[green]✓ Switched to branch '{head_branch}' for PR.[/green]")
         
-        with console.status(f"[yellow]Pushing '{head_branch}' to remote...[/yellow]"):
+        with console.status(f"[yellow]Pushing '{head_branch}' to remote...[/yellow]", spinner="bouncingBall", spinner_style="yellow"):
             await git_utils.push(repo_path, head_branch, set_upstream=True)
 
         title = await questionary.text("PR Title:").ask_async()
@@ -159,7 +159,7 @@ async def interactive_pr_creation(session):
             return
         
         console.print(f"[cyan]Creating PR: {head_branch} → {base}[/cyan]")
-        with console.status("Creating Pull Request..."):
+        with console.status("Creating Pull Request...", spinner="bouncingBall"):
             await service.create_pull_request(title, body, head_branch, base)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error creating PR: {e}[/red]")
@@ -168,7 +168,7 @@ async def repo_summary(session):
     """Logic to get AI summary of the repo."""
     try:
         service = GitHubService(session.config)
-        with console.status("[dim][bold cyan]Generating AI repository summary...[/bold cyan][/dim]"):
+        with console.status("[dim][bold cyan]Generating AI repository summary...[/bold cyan][/dim]", spinner="bouncingBall", spinner_style="cyan"):
             summary = await service.get_ai_repo_summary()
         markdown_content = Markdown(summary)
         console.print(Panel(
@@ -187,7 +187,7 @@ async def pr_review(session, pr_number_str: str):
     pr_number = int(pr_number_str)
     try:
         service = GitHubService(session.config)
-        with console.status(f"[dim][cyan]Generating AI review...[/cyan][/dim]"):
+        with console.status(f"[dim][cyan]Generating AI review...[/cyan][/dim]", spinner="bouncingBall", spinner_style="cyan"):
             summary = await service.get_ai_pr_summary(pr_number)
         
         markdown_content = Markdown(summary)
@@ -207,7 +207,7 @@ async def approve_pr(session, pr_number_str: str):
     pr_number = int(pr_number_str)
     try:
         service = GitHubService(session.config)
-        with console.status(f"Approving PR #{pr_number}..."):
+        with console.status(f"Approving PR #{pr_number}...", spinner="bouncingBall"):
             await service.approve_pr(pr_number)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -222,7 +222,7 @@ async def comment_on_pr(session, pr_number_str: str):
         if not comment:
             return console.print("[yellow]Comment cancelled.[/yellow]")
         service = GitHubService(session.config)
-        with console.status(f"Posting comment to PR #{pr_number}..."):
+        with console.status(f"Posting comment to PR #{pr_number}...", spinner="bouncingBall"):
             await service.comment_on_pr(pr_number, comment)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -240,7 +240,7 @@ async def merge_pr(session, pr_number_str: str):
         ).ask_async()
         
         service = GitHubService(session.config)
-        with console.status(f"Merging PR #{pr_number}..."):
+        with console.status(f"Merging PR #{pr_number}...", spinner="bouncingBall"):
             await service.merge_pr(pr_number, method)
     except (GitHubServiceError, NotAGitRepositoryError) as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -262,7 +262,7 @@ async def list_issues(session, assignee_filter: Optional[str]):
             else:
                 filter_text = f" (Assigned to '{assignee_filter}')"
 
-        with console.status(f"Fetching open issues{filter_text}..."):
+        with console.status(f"Fetching open issues{filter_text}...", spinner="bouncingBall"):
             issues = await service.get_issues(assignee_filter=assignee_filter)
         
         if not issues.totalCount:
@@ -286,7 +286,7 @@ async def list_prs(session):
     """Logic to list open pull requests."""
     try:
         service = GitHubService(session.config)
-        with console.status("Fetching open pull requests..."):
+        with console.status("Fetching open pull requests...", spinner="bouncingBall"):
             prs = await service.get_open_prs()
 
         if not prs.totalCount:

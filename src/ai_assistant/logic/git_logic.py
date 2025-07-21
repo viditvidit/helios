@@ -61,7 +61,7 @@ async def switch(branch_name: str = None, create: bool = False):
             console.print(f"[red]Failed to switch to branch '{branch_name}'.[/red]")
     
     try:
-        with console.status("[dim]Fetching available branches...[/dim]"):
+        with console.status("[dim]Fetching available branches...[/dim]", spinner="bouncingBall"):
             local_branches = await git_utils.get_local_branches(repo_path)
             remote_branches = await git_utils.get_all_branches(repo_path)
             current_branch = await git_utils.get_current_branch(repo_path)
@@ -102,7 +102,7 @@ async def pull():
         console.print("[red]Not a git repository.[/red]")
         return False
     branch = await git_utils.get_current_branch(repo_path)
-    with console.status(f"Pulling latest changes for '{branch}'..."):
+    with console.status(f"Pulling latest changes for '{branch}'...", spinner="bouncingBall"):
         if await git_utils.pull(repo_path):
             console.print(f"[green]✓ Pulled latest changes for '{branch}'.[/green]")
             return True
@@ -118,7 +118,7 @@ async def push():
         console.print("[red]Not a git repository.[/red]")
         return False
     branch = await git_utils.get_current_branch(repo_path)
-    with console.status(f"Pushing changes to 'origin/{branch}'..."):
+    with console.status(f"Pushing changes to 'origin/{branch}'...", spinner="bouncingBall"):
         try:
             await git_utils.push(repo_path, branch)
             console.print(f"[green]✓ Pushed changes successfully.[/green]")

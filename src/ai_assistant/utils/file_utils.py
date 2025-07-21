@@ -12,7 +12,7 @@ def build_repo_context(repo_path: Path, config: Config) -> Dict[str, str]:
     Option 1 - Remove file size limits to include full context:
     """
     context = {}
-    excluded_dirs = {'.git', 'node_modules', '__pycache__', 'venv', '.venv', 'build', 'dist', 'target', 'tests'}
+    excluded_dirs = {'.git', '.helios', 'node_modules', '__pycache__', 'venv', '.venv', 'build', 'dist', 'target', 'tests'}
 
     for root, dirs, files in os.walk(repo_path, topdown=True):
         dirs[:] = [d for d in dirs if d not in excluded_dirs]
