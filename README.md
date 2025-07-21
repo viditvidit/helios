@@ -58,9 +58,10 @@ Modify configuration settings in `configs/models.yaml` to customize:
 
 ### GitHub Features:
 
-**Smart Commit-Push-Review-PR**
+**Smart Review**
 ![file staging](images/rv.png)
 ![view diff](images/rv2.png)
+![smart push](images/rv3.png)
 **Open PRs**
 ![open PRS](images/open-pr.png)
 
