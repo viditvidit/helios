@@ -31,10 +31,10 @@ async def create_project_workspace(session, directory_name: str) -> bool:
     session.work_dir = work_dir
     return True
 
-async def review_and_commit_changes(session, commit_message: str, show_diff: bool = True) -> bool:
+async def review_and_commit_changes(session, commit_message: str, show_diff: bool = True, push: bool = True) -> bool:
     """
     A non-interactive tool for the agent to review and commit changes.
-    It stages all unstaged files, displays the diff, and commits with a given message.
+    It stages all unstaged files, displays the diff, commits with a given message, and optionally pushes changes.
     """
     git_utils = GitUtils()
     repo_path = session.work_dir # Use the session's active work_dir
@@ -43,10 +43,15 @@ async def review_and_commit_changes(session, commit_message: str, show_diff: boo
         console.print("[red]Not a git repository.[/red]")
         return False
 
+    # Stage both tracked (modified) and untracked files
     unstaged = await git_utils.get_unstaged_files(repo_path)
     if unstaged:
-        console.print("[dim]Staging all detected changes...[/dim]")
+        console.print("[dim]Staging modified files...[/dim]")
         await git_utils.add_files(repo_path, unstaged)
+    
+    # Also stage any untracked files to ensure nothing is missed
+    console.print("[dim]Ensuring all files are staged (including new files)...[/dim]")
+    await git_utils.add_files(repo_path, ['.'])
 
     per_file_diffs = await git_utils.get_staged_diff_by_file(repo_path)
     if not per_file_diffs:
@@ -63,6 +68,18 @@ async def review_and_commit_changes(session, commit_message: str, show_diff: boo
     console.print(f"Committing with message: [italic]'{commit_message}'[/italic]")
     await git_utils.commit(repo_path, commit_message)
     console.print("[green]✓ Changes committed.[/green]")
+    
+    # Add push functionality
+    if push:
+        try:
+            console.print("[dim]Pushing changes to remote repository...[/dim]")
+            current_branch = await git_utils.get_current_branch(repo_path)
+            push_result = await git_utils.push(repo_path, remote="origin", branch=current_branch)
+            console.print("[green]✓ Changes pushed to remote repository.[/green]")
+        except Exception as e:
+            console.print(f"[yellow]Warning: Failed to push changes: {str(e)}[/yellow]")
+            console.print("[yellow]Commit was successful, but you'll need to push manually.[/yellow]")
+    
     return True
 
 async def _get_ai_corrected_command(session, original_command: str, stderr: str) -> str:

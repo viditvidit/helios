@@ -1,74 +1,35 @@
 # Helios
 
+###### Written by Helios
+
 A command-line AI assistant for software engineering tasks with code generation, git integration, and repository management capabilities.
 
 ## Table of Contents
 - [Features](#features)
-- [File Structure](#file-structure)
-- [Prerequisites](#prerequisites)
 - [Usage](#usage)
 - [Configuration](#configuration)
+- [Demo](#demo)
 
 ## Features
 
 The AI Code Assistant provides the following core functionalities:
 
-- Code generation and modification
-- Git integration for context-aware responses
+- Code generation and modification with context-awareness
+- Git integration 
 - File management commands
 - Repository indexing and refresh
-- AI model selection and switching
-- Conversation history tracking
 - GitHub API interactions
 - Project structure creation and validation
 
-## File Structure
-
-### Core Components
-
-#### `src/ai_assistant/cli/interactive/display.py`
-- Manages command-line interface display
-- Handles help text formatting and user feedback
-- Implements the `show_help()` function for displaying available commands
-
-#### `src/ai_assistant/services/github_service.py`
-- Provides GitHub API interaction capabilities
-- Handles pull request reviews and summaries
-- Implements PR analysis with AI-driven insights
-
-#### `src/ai_assistant/logic/agent/planner.py`
-- Contains logic for task planning and execution
-- Implements agentic mode instructions and principles
-- Manages the generation of detailed, step-by-step plans
-
-#### `src/ai_assistant/models/request.py`
-- Defines data models for AI service requests
-- Includes code generation and modification requests
-- Provides structure for response handling
-
-### Configuration Files
-
-#### `configs/models.yaml`
-- Contains AI model configurations
-- Specifies agent instructions and principles
-- Includes guidelines for code generation and project setup
-
-## Prerequisites
-- Python 3.8 or higher
-- Git repository setup
-
 ## Usage
 
-### Project Setup Example
+### Agent Prompt Example
 
 ```bash
-# Create a new project structure:
-/agent create a documentation website with:
-- docs/
-  - getting-started/
-    - index.md
-  - api-reference/
-    - index.md
+/knight create a .NET console application named 'dotnet-weather-cli'. The app should take a city name as a command-line argument, make a GET request to a public weather API (like Open-Meteo), and print the current temperature for that city. Use the `HttpClient` class for the API call and `Newtonsoft.Json` to parse the response.
+```
+```bash
+/help # for exploring all features of Helios
 ```
 
 ## Configuration
@@ -79,3 +40,36 @@ Modify configuration settings in `configs/models.yaml` to customize:
 - Agent instructions and principles
 - Code generation guidelines
 - Project structure templates
+
+## Demo
+
+### Landing:
+![Welcome Page](images/landing.png)
+
+### File Creation
+![file creation](images/code.png)
+![code created and added](images/code2.png)
+
+### File mentions
+![file mention](images/mentions.png)
+![file explanation](images/explain.png)
+
+### GitHub Review:
+
+![file staging](images/rv.png)
+![view diff](images/rv2.png)
+
+### Knight Agent
+**Agent prompt and plan**
+![prompt](images/agent-prompt.png)
+
+**Execution**
+![files creatios](images/agent-fc.png)
+
+**Git Push**
+![git push](images/agent-git-push.png)
+![new branch](images/agent-git-creation.png)
+
+Other Git creations:
+
+![examples](images/demo.png)

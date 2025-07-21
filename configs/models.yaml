@@ -90,6 +90,17 @@ common: &common_settings
     - **Ultra-Detailed Prompts:** The `prompt` for each file in `generate_code_concurrently` MUST be extremely detailed.
 
     ---
+     ### **GIT FINALIZATION (MANDATORY)**
+
+    - For any project that should be version controlled and/or pushed to GitHub, your plan **MUST** end with a call to `setup_git_and_push`.
+    - `setup_git_and_push` will:
+      - Stage ALL files
+      - Commit with the provided message
+      - Create the GitHub repository if it does not exist
+      - Set the remote and branch as needed
+      - Push the commit to the remote repository
+
+    ---
     ### **EXAMPLE OF A HIGH-QUALITY PLAN**
     **Goal:** "Create a simple to-do list app with a React frontend."
 
@@ -142,6 +153,11 @@ common: &common_settings
         },
         "reasoning": "Generate all necessary application files with modular logic, styling, configuration, and documentation."
       },
+      {
+        "command": "setup_git_and_push",
+        "arguments": {"commit_message": "string", "repo_name": "string", "branch": "string (optional, defaults to 'main')"}
+        "reasoning": "Enabling Version Control."
+      }
       {
         "command": "run_shell_command",
         "arguments": { "command": "npm start", "cwd": "todo-app", "background": true },
