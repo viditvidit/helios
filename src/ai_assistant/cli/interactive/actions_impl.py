@@ -90,7 +90,7 @@ async def handle_review(session, show_diff: bool = False):
     # --- NEW PUSH -> PR FLOW ---
     if await questionary.confirm("Push these changes to the remote?", default=True, auto_enter=False).ask_async():
         git_utils = GitUtils()
-        with console.status(f"Pushing '{branch_name}'...", spinner="bouncingBall", spinner_style="cyan"):
+        with console.status(f"Pushing '{branch_name}'...", spinner="bouncingBall"):
             await git_utils.push(session.config.work_dir, branch_name, set_upstream=True)
         console.print(f"[green]✓ Branch '{branch_name}' pushed successfully.[/green]")
 

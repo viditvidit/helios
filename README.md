@@ -20,6 +20,8 @@ The AI Code Assistant provides the following core functionalities:
 - Repository indexing and refresh
 - GitHub API interactions
 - Project structure creation and validation
+- AI PR reviews
+- AI Repository summaries
 
 ## Usage
 
