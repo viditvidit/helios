@@ -69,17 +69,18 @@ class Executor:
 
         return action_text, reasoning
 
-    async def execute_plan(self, plan: List[Any], goal: str) -> None:
-        summary = await self._summarize_plan_with_ai(plan, goal)
-        
-        summary_title = Text("Execution Summary", style=Theme.SUMMARY_TITLE)
-        console.print(Panel(Markdown(summary), title=summary_title, border_style=Theme.SUMMARY_BORDER, title_align="left"))
+    async def execute_plan(self, plan: List[Any], goal: str, interactive: bool = True) -> None:
+        if interactive:
+            summary = await self._summarize_plan_with_ai(plan, goal)
+            
+            summary_title = Text("Execution Summary", style=Theme.SUMMARY_TITLE)
+            console.print(Panel(Markdown(summary), title=summary_title, border_style=Theme.SUMMARY_BORDER, title_align="left"))
 
-        if not await questionary.confirm("Proceed with this plan?", default=True, auto_enter=False).ask_async():
-            console.print("[yellow]Plan execution aborted by user.[/yellow]")
-            return
+            if not await questionary.confirm("Proceed with this plan?", default=True, auto_enter=False).ask_async():
+                console.print("[yellow]Plan execution aborted by user.[/yellow]")
+                return
 
-        console.print()
+            console.print()
         
         editable_plan = copy.deepcopy(plan)
         
@@ -97,24 +98,28 @@ class Executor:
                 break
 
             current_step += 1
-            step_title_text = Text(f"Step {current_step}/{total_steps}", style="")
-
-            # --- RENDER THE ABSTRACTED VIEW ---
             action_str, reasoning_str = self._render_step_for_display(step)
-            display_content = f"{action_str}\n\n[bold]Reasoning:[/bold] [dim]{reasoning_str}[/dim]"
-            console.print(Panel(display_content, title=step_title_text, border_style=Theme.STEP_PANEL_BORDER, expand=False))
 
-            action = await questionary.select("Action:", choices=["Execute", "Skip", "Edit", "Abort"]).ask_async()
+            if interactive:
+                step_title_text = Text(f"Step {current_step}/{total_steps}", style="")
+                display_content = f"{action_str}\n\n[bold]Reasoning:[/bold] [dim]{reasoning_str}[/dim]"
+                console.print(Panel(display_content, title=step_title_text, border_style=Theme.STEP_PANEL_BORDER, expand=False))
 
-            if action == "Abort": return
-            if action == "Skip": continue
-            if action == "Edit":
-                step_json = json.dumps(step, indent=2)
-                edited_json_str = await questionary.text("Edit step JSON:", multiline=True, default=step_json).ask_async()
-                try:
-                    step = json.loads(edited_json_str or "{}")
-                    command_name = step.get("command") # Re-read command name after edit
-                except json.JSONDecodeError: continue
+                action = await questionary.select("Action:", choices=["Execute", "Skip", "Edit", "Abort"]).ask_async()
+
+                if action == "Abort": return
+                if action == "Skip": continue
+                if action == "Edit":
+                    step_json = json.dumps(step, indent=2)
+                    edited_json_str = await questionary.text("Edit step JSON:", multiline=True, default=step_json).ask_async()
+                    try:
+                        step = json.loads(edited_json_str or "{}")
+                        command_name = step.get("command") # Re-read command name after edit
+                    except json.JSONDecodeError: continue
+            else:
+                # Non-interactive mode: just announce the step being executed.
+                panel_title = Text(f"Step {current_step}/{total_steps}", style=Theme.PROMPT)
+                console.print(Panel(action_str, title=panel_title, border_style=Theme.STEP_PANEL_BORDER, expand=False))
 
             args = step.get("arguments", {})
             if command_name in self.tools:
