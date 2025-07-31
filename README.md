@@ -40,6 +40,14 @@ pip install -e .
 helios
 ```
 
+### Create a `.env` file
+```env
+GITHUB_TOKEN = <YOUR GIT TOKEN>
+GITHUB_USERNAME = <YOUR GIT USERNAME>
+
+OLLAMA_HOST = http://localhost:11434 # or your custom host link
+```
+
 ### Change or Add your model of choice
 Make changes in: [models.yaml](configs/models.yaml)
 ```yaml
