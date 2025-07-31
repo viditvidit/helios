@@ -25,13 +25,41 @@ The AI Code Assistant provides the following core functionalities:
 
 ## Usage
 
+> Prerequisites: Python, Ollama
+
+### Run Helios
+
+```bash
+# Clone repo
+git clone https://github.com/viditvidit/helios.git
+
+# Run in development mode
+pip install -e .
+
+# Run this to use Helios
+helios
+```
+
+### Change or Add your model of choice
+Make changes in: [models.yaml](configs/models.yaml)
+```yaml
+# Change here
+models: 
+  gemma3: # Set custom name
+    name: 'gemma3:27b-it-q4_K_M' # Enter model name as seen in ollama
+    <<: *common_settings
+```
+
+
+### Know all features:
+```bash
+/help # For exploring all features of Helios
+```
+
 ### Agent Prompt Example
 
 ```bash
 /knight create a .NET console application named 'dotnet-weather-cli'. The app should take a city name as a command-line argument, make a GET request to a public weather API (like Open-Meteo), and print the current temperature for that city. Use the `HttpClient` class for the API call and `Newtonsoft.Json` to parse the response.
-```
-```bash
-/help # for exploring all features of Helios
 ```
 
 ## Configuration
