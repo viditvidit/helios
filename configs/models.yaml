@@ -1,5 +1,5 @@
 # Default model to use if not specified elsewhere. This must match a key under 'models'.
-default_model: "devstral"
+default_model: "gpt-oss"
 
 # Common settings to be reused
 common: &common_settings
@@ -168,6 +168,11 @@ common: &common_settings
 
 # Dictionary of all available models. The keys are used to select a model via the CLI.
 models:
+  
+  gpt-oss:
+    name: 'gpt-oss:20b'
+    <<: *common_settings
+
   gemma3:
     name: 'gemma3:27b-it-q4_K_M'
     <<: *common_settings
